@@ -567,6 +567,11 @@ document.getElementById('saveGrantBtn').addEventListener('click', async () => {
 });
 
 // ---------- Sessions ----------
+function methodPill(method) {
+  const isHttps = method === 'https';
+  return `<span class="pill ${isHttps ? 'ok' : 'mute'}"><span class="dot"></span>${isHttps ? 'HTTPS' : 'SSH'}</span>`;
+}
+
 function renderSessions(sessions) {
   const tbody = document.querySelector('#sessionsTable tbody');
   tbody.innerHTML = '';
@@ -575,7 +580,8 @@ function renderSessions(sessions) {
     const since = new Date(s.connectedAt).toLocaleTimeString();
     tr.innerHTML = `
       <td>${escapeHtml(s.username)}</td>
-      <td>${escapeHtml(s.site)} — ${escapeHtml(s.port)}</td>
+      <td>${methodPill(s.method)}</td>
+      <td>${s.portLabel ? escapeHtml(s.portLabel) : '<span class="hint">at menu</span>'}</td>
       <td>${since}</td>
       <td></td>
     `;
