@@ -53,12 +53,22 @@
     <div class="tab-content active" id="tab-sites">
       <div class="panel">
         <h2>Sites</h2>
-        <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Ports are entered here by hand for now &mdash; the id must match a real port already configured on that edge box's Serial Ports tab.</p>
+        <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Ports can be entered here by hand, or reported automatically by a box that's in managed mode and heartbeating &mdash; whichever touched a site most recently wins.</p>
         <table class="data-table" id="sitesTable">
-          <thead><tr><th>Site</th><th>Status</th><th>Ports</th><th></th></tr></thead>
+          <thead><tr><th>Site</th><th>Status</th><th>Version</th><th>Last Seen</th><th>Ports</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <button id="addSiteBtn">+ Add Site</button>
+      </div>
+
+      <div class="panel">
+        <h2>Enrollment Tokens</h2>
+        <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it without copying its public key by hand.</p>
+        <table class="data-table" id="tokensTable">
+          <thead><tr><th>Site name</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addTokenBtn">+ Generate Token</button>
       </div>
     </div>
 
@@ -198,6 +208,38 @@
       <div class="modal-actions">
         <button id="cancelPortBtn" class="secondary">Cancel</button>
         <button id="savePortBtn" class="primary">Add Port</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate enrollment token modal -->
+  <div class="modal-backdrop" id="tokenModalBackdrop">
+    <div class="modal">
+      <h3>Generate Enrollment Token</h3>
+      <div class="field-row column">
+        <label for="tokenSiteName">Site name</label>
+        <input type="text" id="tokenSiteName" placeholder="e.g. Building 3 Wiring Closet" />
+        <span class="field-error" id="tokenSiteNameError"></span>
+      </div>
+      <div class="field-row column">
+        <label for="tokenExpiry">Expires after (minutes, blank = never)</label>
+        <input type="number" id="tokenExpiry" min="1" placeholder="e.g. 60" />
+      </div>
+      <div class="modal-actions">
+        <button id="cancelTokenBtn" class="secondary">Cancel</button>
+        <button id="saveTokenBtn" class="primary">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reveal a freshly generated token -->
+  <div class="modal-backdrop" id="tokenRevealBackdrop">
+    <div class="modal">
+      <h3>Enrollment Token</h3>
+      <p class="hint">Paste this into the edge box's Central Office panel. It's shown once and works one time.</p>
+      <pre class="code-block" id="tokenRevealValue"></pre>
+      <div class="modal-actions">
+        <button id="closeTokenRevealBtn" class="primary">Done</button>
       </div>
     </div>
   </div>

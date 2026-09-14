@@ -182,9 +182,12 @@ async function loadSites() {
     const portsList = site.ports.length
       ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code>${escapeHtml(p.id)}</code> <a href="#" data-site="${site.id}" data-port="${p.id}" class="del-port">remove</a></div>`).join('')
       : '<span class="hint">none yet</span>';
+    const lastSeen = site.lastSeenAt ? new Date(site.lastSeenAt).toLocaleString() : '<span class="hint">never</span>';
     tr.innerHTML = `
       <td>${escapeHtml(site.name)}</td>
       <td>${statusPill(site.connected)}</td>
+      <td>${site.reportedVersion ? escapeHtml(site.reportedVersion) : '<span class="hint">&mdash;</span>'}</td>
+      <td>${lastSeen}</td>
       <td>${portsList}</td>
       <td></td>
     `;
@@ -192,6 +195,13 @@ async function loadSites() {
     const addPortBtn = document.createElement('button');
     addPortBtn.textContent = '+ Port';
     addPortBtn.addEventListener('click', () => openPortModal(site.id));
+    const queueBtn = document.createElement('button');
+    queueBtn.textContent = 'Queue Update';
+    queueBtn.style.marginLeft = '6px';
+    queueBtn.addEventListener('click', async () => {
+      await api.post(`/api/sites/${site.id}/queue-update`);
+      alert(`An update was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
+    });
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
     delBtn.className = 'danger';
@@ -203,6 +213,7 @@ async function loadSites() {
       }
     });
     actionsCell.appendChild(addPortBtn);
+    actionsCell.appendChild(queueBtn);
     actionsCell.appendChild(delBtn);
     tbody.appendChild(tr);
   }
@@ -267,6 +278,62 @@ document.getElementById('savePortBtn').addEventListener('click', async () => {
   } catch (err) {
     setFieldError('portIdInput', err.message);
   }
+});
+
+// ---------- Enrollment tokens ----------
+async function loadTokens() {
+  const tokens = await api.get('/api/enrollment-tokens');
+  const tbody = document.querySelector('#tokensTable tbody');
+  tbody.innerHTML = '';
+  for (const t of tokens) {
+    const tr = document.createElement('tr');
+    const expired = t.expiresAt && new Date(t.expiresAt).getTime() < Date.now();
+    const status = t.used ? 'Used' : expired ? 'Expired' : 'Unused';
+    tr.innerHTML = `
+      <td>${escapeHtml(t.name)}</td>
+      <td>${new Date(t.createdAt).toLocaleString()}</td>
+      <td>${t.expiresAt ? new Date(t.expiresAt).toLocaleString() : '<span class="hint">never</span>'}</td>
+      <td>${escapeHtml(status)}</td>
+      <td></td>
+    `;
+    const actionsCell = tr.lastElementChild;
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Revoke';
+    delBtn.className = 'danger';
+    delBtn.addEventListener('click', async () => {
+      await api.del(`/api/enrollment-tokens/${t.token}`);
+      await loadTokens();
+    });
+    actionsCell.appendChild(delBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('addTokenBtn').addEventListener('click', () => {
+  document.getElementById('tokenSiteName').value = '';
+  document.getElementById('tokenExpiry').value = '';
+  clearFieldError('tokenSiteName');
+  document.getElementById('tokenModalBackdrop').classList.add('open');
+});
+document.getElementById('cancelTokenBtn').addEventListener('click', () => {
+  document.getElementById('tokenModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveTokenBtn').addEventListener('click', async () => {
+  const name = document.getElementById('tokenSiteName').value.trim();
+  const expiresInMinutes = document.getElementById('tokenExpiry').value.trim();
+  if (!name) { setFieldError('tokenSiteName', 'A site name is required.'); return; }
+  try {
+    const token = await api.post('/api/enrollment-tokens', { name, expiresInMinutes: expiresInMinutes || undefined });
+    document.getElementById('tokenModalBackdrop').classList.remove('open');
+    document.getElementById('tokenRevealValue').textContent = token.token;
+    document.getElementById('tokenRevealBackdrop').classList.add('open');
+    await loadTokens();
+  } catch (err) {
+    setFieldError('tokenSiteName', err.message);
+  }
+});
+document.getElementById('closeTokenRevealBtn').addEventListener('click', () => {
+  document.getElementById('tokenRevealBackdrop').classList.remove('open');
 });
 
 // ---------- Users ----------
@@ -548,6 +615,7 @@ function connectEvents() {
 // ---------- Init ----------
 async function initApp() {
   await loadSites();
+  await loadTokens();
   await loadGroups();
   await loadUsers();
   await loadMyUsername();
