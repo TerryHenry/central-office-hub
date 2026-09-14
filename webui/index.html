@@ -67,10 +67,13 @@
         <h2>Sites</h2>
         <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Ports can be entered here by hand, or reported automatically by a box that's in managed mode and heartbeating &mdash; whichever touched a site most recently wins.</p>
         <table class="data-table" id="sitesTable">
-          <thead><tr><th>Site</th><th>Status</th><th>Version</th><th>Last Seen</th><th>Ports</th><th></th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="sitesSelectAll" /></th><th>Site</th><th>Status</th><th>Version</th><th>Last Seen</th><th>Backup</th><th>Ports</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
-        <button id="addSiteBtn">+ Add Site</button>
+        <div class="field-row">
+          <button id="addSiteBtn">+ Add Site</button>
+          <button id="bulkQueueUpdateBtn">Queue Update for Selected</button>
+        </div>
       </div>
 
       <div class="panel">
@@ -283,6 +286,24 @@
       <div class="modal-actions">
         <button id="cancelSiteBtn" class="secondary">Cancel</button>
         <button id="saveSiteBtn" class="primary">Add Site</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore a site's config from a backup file -->
+  <div class="modal-backdrop" id="siteRestoreModalBackdrop">
+    <div class="modal">
+      <h3>Restore Config to <span id="siteRestoreSiteName"></span></h3>
+      <p class="hint">Queues a config restore for this site -- applied on its next heartbeat (managed mode, box must be online). This replaces its entire configuration: ports, users, admin accounts, everything.</p>
+      <div class="field-row column">
+        <label for="siteRestoreFile">Backup file</label>
+        <input type="file" id="siteRestoreFile" accept="application/json" />
+      </div>
+      <input type="hidden" id="siteRestoreSiteId" />
+      <span class="field-error" id="siteRestoreError"></span>
+      <div class="modal-actions">
+        <button id="cancelSiteRestoreBtn" class="secondary">Cancel</button>
+        <button id="saveSiteRestoreBtn" class="danger">Queue Restore</button>
       </div>
     </div>
   </div>

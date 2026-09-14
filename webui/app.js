@@ -209,17 +209,23 @@ async function loadSites() {
   const sites = await api.get('/api/sites');
   const tbody = document.querySelector('#sitesTable tbody');
   tbody.innerHTML = '';
+  document.getElementById('sitesSelectAll').checked = false;
   for (const site of sites) {
     const tr = document.createElement('tr');
     const portsList = site.ports.length
       ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code>${escapeHtml(p.id)}</code> <a href="#" data-site="${site.id}" data-port="${p.id}" class="del-port">remove</a></div>`).join('')
       : '<span class="hint">none yet</span>';
     const lastSeen = site.lastSeenAt ? new Date(site.lastSeenAt).toLocaleString() : '<span class="hint">never</span>';
+    const backupInfo = site.lastBackup
+      ? `<span class="hint">${new Date(site.lastBackup.takenAt).toLocaleDateString()}</span>`
+      : '<span class="hint">none yet</span>';
     tr.innerHTML = `
+      <td><input type="checkbox" class="site-select" data-site="${site.id}" /></td>
       <td>${escapeHtml(site.name)}</td>
       <td>${statusPill(site.connected)}</td>
       <td>${site.reportedVersion ? escapeHtml(site.reportedVersion) : '<span class="hint">&mdash;</span>'}</td>
       <td>${lastSeen}</td>
+      <td>${backupInfo}</td>
       <td>${portsList}</td>
       <td></td>
     `;
@@ -234,6 +240,30 @@ async function loadSites() {
       await api.post(`/api/sites/${site.id}/queue-update`);
       alert(`An update was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
     });
+    const requestBackupBtn = document.createElement('button');
+    requestBackupBtn.textContent = 'Request Backup';
+    requestBackupBtn.style.marginLeft = '6px';
+    requestBackupBtn.addEventListener('click', async () => {
+      await api.post(`/api/sites/${site.id}/backup/request`);
+      alert(`A config backup was requested from "${site.name}" -- it's sent on the box's next heartbeat.`);
+    });
+    actionsCell.appendChild(addPortBtn);
+    actionsCell.appendChild(queueBtn);
+    actionsCell.appendChild(requestBackupBtn);
+    if (site.lastBackup) {
+      const downloadBackupBtn = document.createElement('button');
+      downloadBackupBtn.textContent = 'Download Backup';
+      downloadBackupBtn.style.marginLeft = '6px';
+      downloadBackupBtn.addEventListener('click', () => {
+        window.location.href = `/api/sites/${site.id}/backup`;
+      });
+      actionsCell.appendChild(downloadBackupBtn);
+    }
+    const restoreBtn = document.createElement('button');
+    restoreBtn.textContent = 'Restore Backup';
+    restoreBtn.style.marginLeft = '6px';
+    restoreBtn.addEventListener('click', () => openSiteRestoreModal(site));
+    actionsCell.appendChild(restoreBtn);
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
     delBtn.className = 'danger';
@@ -244,8 +274,6 @@ async function loadSites() {
         await loadSites();
       }
     });
-    actionsCell.appendChild(addPortBtn);
-    actionsCell.appendChild(queueBtn);
     actionsCell.appendChild(delBtn);
     tbody.appendChild(tr);
   }
@@ -257,6 +285,54 @@ async function loadSites() {
     });
   });
 }
+
+document.getElementById('sitesSelectAll').addEventListener('change', (e) => {
+  document.querySelectorAll('#sitesTable .site-select').forEach((cb) => (cb.checked = e.target.checked));
+});
+
+document.getElementById('bulkQueueUpdateBtn').addEventListener('click', async () => {
+  const siteIds = Array.from(document.querySelectorAll('#sitesTable .site-select:checked')).map((cb) => cb.dataset.site);
+  if (siteIds.length === 0) {
+    alert('Select at least one site first.');
+    return;
+  }
+  if (!confirm(`Queue an update for ${siteIds.length} site${siteIds.length === 1 ? '' : 's'}? Each applies on its own next heartbeat.`)) return;
+  const result = await api.post('/api/sites/queue-update/bulk', { siteIds });
+  alert(`Queued an update for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+});
+
+function openSiteRestoreModal(site) {
+  document.getElementById('siteRestoreSiteId').value = site.id;
+  document.getElementById('siteRestoreSiteName').textContent = site.name;
+  document.getElementById('siteRestoreFile').value = '';
+  document.getElementById('siteRestoreError').textContent = '';
+  document.getElementById('siteRestoreModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSiteRestoreBtn').addEventListener('click', () => {
+  document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSiteRestoreBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteRestoreSiteId').value;
+  const fileInput = document.getElementById('siteRestoreFile');
+  const file = fileInput.files[0];
+  const errEl = document.getElementById('siteRestoreError');
+  if (!file) {
+    errEl.textContent = 'Choose a backup file first.';
+    return;
+  }
+  if (!confirm('This replaces the entire configuration on that edge box the next time it heartbeats. Continue?')) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch(`/api/sites/${siteId}/backup/restore`, { method: 'POST', body: formData });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
+    alert('Restore queued -- it applies on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
 
 document.getElementById('addSiteBtn').addEventListener('click', () => {
   document.getElementById('siteName').value = '';
