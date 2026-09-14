@@ -269,6 +269,204 @@ document.getElementById('savePortBtn').addEventListener('click', async () => {
   }
 });
 
+// ---------- Users ----------
+let allGroups = [];
+
+async function loadUsers() {
+  const users = await api.get('/api/users');
+  const tbody = document.querySelector('#usersTable tbody');
+  tbody.innerHTML = '';
+  for (const user of users) {
+    const tr = document.createElement('tr');
+    const groupNames = user.groupIds
+      .map((id) => allGroups.find((g) => g.id === id))
+      .filter(Boolean)
+      .map((g) => escapeHtml(g.name));
+    tr.innerHTML = `
+      <td>${escapeHtml(user.username)}</td>
+      <td>${groupNames.length ? groupNames.join(', ') : '<span class="hint">none</span>'}</td>
+      <td></td>
+    `;
+    const actionsCell = tr.lastElementChild;
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => openUserModal(user));
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'danger';
+    delBtn.style.marginLeft = '6px';
+    delBtn.addEventListener('click', async () => {
+      if (confirm(`Remove user "${user.username}"?`)) {
+        await api.del(`/api/users/${user.id}`);
+        await loadUsers();
+      }
+    });
+    actionsCell.appendChild(editBtn);
+    actionsCell.appendChild(delBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+function openUserModal(user) {
+  document.getElementById('userModalTitle').textContent = user ? 'Edit User' : 'Add User';
+  document.getElementById('userEditId').value = user ? user.id : '';
+  document.getElementById('userUsername').value = user ? user.username : '';
+  document.getElementById('userPassword').value = '';
+  document.getElementById('userPasswordHint').textContent = user ? '(leave blank to keep the current password)' : '';
+  document.getElementById('userPassword').required = !user;
+  clearFieldError('userUsername');
+  clearFieldError('userPassword');
+
+  const checksEl = document.getElementById('userGroupChecks');
+  checksEl.innerHTML = '';
+  if (allGroups.length === 0) {
+    checksEl.innerHTML = '<span class="hint">No groups yet &mdash; create one on the Groups tab first.</span>';
+  }
+  for (const group of allGroups) {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = group.id;
+    checkbox.checked = !!(user && user.groupIds.includes(group.id));
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(group.name));
+    checksEl.appendChild(label);
+  }
+  document.getElementById('userModalBackdrop').classList.add('open');
+}
+
+document.getElementById('addUserBtn').addEventListener('click', () => openUserModal(null));
+document.getElementById('cancelUserBtn').addEventListener('click', () => {
+  document.getElementById('userModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveUserBtn').addEventListener('click', async () => {
+  const id = document.getElementById('userEditId').value;
+  const username = document.getElementById('userUsername').value.trim();
+  const password = document.getElementById('userPassword').value;
+  const groupIds = Array.from(document.querySelectorAll('#userGroupChecks input:checked')).map((c) => c.value);
+  let valid = true;
+  if (!username) { setFieldError('userUsername', 'A username is required.'); valid = false; }
+  if (!id && !password) { setFieldError('userPassword', 'A password is required.'); valid = false; }
+  if (!valid) return;
+  try {
+    if (id) {
+      await api.post(`/api/users/${id}`, { username, groupIds });
+      if (password) await api.post(`/api/users/${id}/password`, { password });
+    } else {
+      await api.post('/api/users', { username, password, groupIds });
+    }
+    document.getElementById('userModalBackdrop').classList.remove('open');
+    await loadUsers();
+  } catch (err) {
+    setFieldError('userPassword', err.message);
+  }
+});
+
+// ---------- Groups ----------
+async function loadGroups() {
+  allGroups = await api.get('/api/groups');
+  const tbody = document.querySelector('#groupsTable tbody');
+  tbody.innerHTML = '';
+  const sites = await api.get('/api/sites');
+  for (const group of allGroups) {
+    const tr = document.createElement('tr');
+    const grantsEl = document.createElement('div');
+    grantsEl.className = 'grant-list';
+    if (group.grants.length === 0) {
+      grantsEl.innerHTML = '<span class="hint">none yet</span>';
+    }
+    for (const grant of group.grants) {
+      const site = sites.find((s) => s.id === grant.siteId);
+      const port = site && site.ports.find((p) => p.id === grant.portId);
+      const item = document.createElement('div');
+      item.className = 'grant-item';
+      item.innerHTML = `<span>${escapeHtml(site ? site.name : grant.siteId)} — ${escapeHtml(port ? port.label : grant.portId)}</span> <a href="#" class="remove">remove</a>`;
+      item.querySelector('.remove').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await api.del(`/api/groups/${group.id}/grants/${grant.siteId}/${grant.portId}`);
+        await loadGroups();
+      });
+      grantsEl.appendChild(item);
+    }
+    tr.innerHTML = `<td>${escapeHtml(group.name)}</td><td></td><td></td>`;
+    tr.children[1].appendChild(grantsEl);
+    const actionsCell = tr.lastElementChild;
+    const grantBtn = document.createElement('button');
+    grantBtn.textContent = '+ Grant';
+    grantBtn.addEventListener('click', () => openGrantModal(group.id, sites));
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'danger';
+    delBtn.style.marginLeft = '6px';
+    delBtn.addEventListener('click', async () => {
+      if (confirm(`Remove group "${group.name}"? Members lose the access it granted.`)) {
+        await api.del(`/api/groups/${group.id}`);
+        await loadGroups();
+        await loadUsers();
+      }
+    });
+    actionsCell.appendChild(grantBtn);
+    actionsCell.appendChild(delBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('addGroupBtn').addEventListener('click', () => {
+  document.getElementById('groupName').value = '';
+  clearFieldError('groupName');
+  document.getElementById('groupModalBackdrop').classList.add('open');
+});
+document.getElementById('cancelGroupBtn').addEventListener('click', () => {
+  document.getElementById('groupModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveGroupBtn').addEventListener('click', async () => {
+  const name = document.getElementById('groupName').value.trim();
+  if (!name) { setFieldError('groupName', 'A group name is required.'); return; }
+  try {
+    await api.post('/api/groups', { name });
+    document.getElementById('groupModalBackdrop').classList.remove('open');
+    await loadGroups();
+  } catch (err) {
+    setFieldError('groupName', err.message);
+  }
+});
+
+function openGrantModal(groupId, sites) {
+  document.getElementById('grantGroupId').value = groupId;
+  document.getElementById('grantError').textContent = '';
+  const siteSelect = document.getElementById('grantSiteSelect');
+  siteSelect.innerHTML = sites.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  const fillPorts = () => {
+    const site = sites.find((s) => s.id === siteSelect.value);
+    const portSelect = document.getElementById('grantPortSelect');
+    portSelect.innerHTML = site
+      ? site.ports.map((p) => `<option value="${p.id}">${escapeHtml(p.label)}</option>`).join('')
+      : '';
+  };
+  siteSelect.onchange = fillPorts;
+  fillPorts();
+  document.getElementById('grantModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelGrantBtn').addEventListener('click', () => {
+  document.getElementById('grantModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveGrantBtn').addEventListener('click', async () => {
+  const groupId = document.getElementById('grantGroupId').value;
+  const siteId = document.getElementById('grantSiteSelect').value;
+  const portId = document.getElementById('grantPortSelect').value;
+  if (!siteId || !portId) {
+    document.getElementById('grantError').textContent = 'This site has no ports yet.';
+    return;
+  }
+  try {
+    await api.post(`/api/groups/${groupId}/grants`, { siteId, portId });
+    document.getElementById('grantModalBackdrop').classList.remove('open');
+    await loadGroups();
+  } catch (err) {
+    document.getElementById('grantError').textContent = err.message;
+  }
+});
+
 // ---------- Sessions ----------
 function renderSessions(sessions) {
   const tbody = document.querySelector('#sessionsTable tbody');
@@ -350,6 +548,8 @@ function connectEvents() {
 // ---------- Init ----------
 async function initApp() {
   await loadSites();
+  await loadGroups();
+  await loadUsers();
   await loadMyUsername();
   await loadHostKeyFingerprint();
   renderSessions(await api.get('/api/sessions'));

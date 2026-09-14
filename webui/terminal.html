@@ -8,20 +8,26 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="app-mode">
-  <div class="auth-screen active" id="pickerScreen">
+  <div class="auth-screen active" id="loginScreen">
+    <form class="auth-card" id="terminalLoginForm">
+      <h1>Central Office Console</h1>
+      <label>Username</label>
+      <input type="text" id="terminalUsername" required autocomplete="username" />
+      <label>Password</label>
+      <input type="password" id="terminalPassword" required autocomplete="current-password" />
+      <div class="auth-error" id="terminalLoginError"></div>
+      <button type="submit" class="primary">Sign In</button>
+    </form>
+  </div>
+
+  <div class="auth-screen" id="pickerScreen">
     <form class="auth-card" id="pickerForm" style="width: 420px;">
       <h1>Central Office Console</h1>
       <div class="auth-error" id="pickerError"></div>
       <div id="choiceList" style="display: flex; flex-direction: column; gap: 6px;"></div>
-      <p class="hint" id="pickerEmpty" style="display: none;">No connected sites/ports right now.</p>
+      <p class="hint" id="pickerEmpty" style="display: none;">No ports available right now.</p>
+      <button type="button" id="pickerSignOutBtn" class="secondary" style="margin-top: 10px;">Sign Out</button>
     </form>
-  </div>
-
-  <div class="auth-screen" id="disabledScreen">
-    <div class="auth-card">
-      <h1>Not signed in</h1>
-      <p class="hint">Sign in to the <a href="/">admin UI</a> first, then come back here.</p>
-    </div>
   </div>
 
   <div class="terminal-wrap" id="terminalScreen" style="display: none;">

@@ -43,6 +43,8 @@
 
     <div class="tabs">
       <button class="tab-btn active" data-tab="sites">Sites</button>
+      <button class="tab-btn" data-tab="users">Users</button>
+      <button class="tab-btn" data-tab="groups">Groups</button>
       <button class="tab-btn" data-tab="sessions">Sessions</button>
       <button class="tab-btn" data-tab="log">Log</button>
       <button class="tab-btn" data-tab="account">Account</button>
@@ -57,6 +59,30 @@
           <tbody></tbody>
         </table>
         <button id="addSiteBtn">+ Add Site</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-users">
+      <div class="panel">
+        <h2>Console Users</h2>
+        <p class="hint">Console users reach ports through group grants only &mdash; they never see the admin UI. They can connect over SSH (any username other than an admin's or <code>_edge</code>) or the web console at <code>/terminal</code>.</p>
+        <table class="data-table" id="usersTable">
+          <thead><tr><th>Username</th><th>Groups</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addUserBtn">+ Add User</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-groups">
+      <div class="panel">
+        <h2>Groups</h2>
+        <p class="hint">A group grants access to specific ports on specific sites. Add a user to a group to give them that access.</p>
+        <table class="data-table" id="groupsTable">
+          <thead><tr><th>Group</th><th>Grants</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addGroupBtn">+ Add Group</button>
       </div>
     </div>
 
@@ -172,6 +198,69 @@
       <div class="modal-actions">
         <button id="cancelPortBtn" class="secondary">Cancel</button>
         <button id="savePortBtn" class="primary">Add Port</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/edit user modal -->
+  <div class="modal-backdrop" id="userModalBackdrop">
+    <div class="modal">
+      <h3 id="userModalTitle">Add User</h3>
+      <div class="field-row column">
+        <label for="userUsername">Username</label>
+        <input type="text" id="userUsername" />
+        <span class="field-error" id="userUsernameError"></span>
+      </div>
+      <div class="field-row column" id="userPasswordRow">
+        <label for="userPassword">Password <span class="hint" id="userPasswordHint"></span></label>
+        <input type="password" id="userPassword" />
+        <span class="field-error" id="userPasswordError"></span>
+      </div>
+      <div class="field-row column">
+        <label>Groups</label>
+        <div id="userGroupChecks" class="check-list"></div>
+      </div>
+      <input type="hidden" id="userEditId" />
+      <div class="modal-actions">
+        <button id="cancelUserBtn" class="secondary">Cancel</button>
+        <button id="saveUserBtn" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add group modal -->
+  <div class="modal-backdrop" id="groupModalBackdrop">
+    <div class="modal">
+      <h3>Add Group</h3>
+      <div class="field-row column">
+        <label for="groupName">Group name</label>
+        <input type="text" id="groupName" placeholder="e.g. NOC Team" />
+        <span class="field-error" id="groupNameError"></span>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelGroupBtn" class="secondary">Cancel</button>
+        <button id="saveGroupBtn" class="primary">Add Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add grant modal -->
+  <div class="modal-backdrop" id="grantModalBackdrop">
+    <div class="modal">
+      <h3>Grant Port Access</h3>
+      <div class="field-row column">
+        <label for="grantSiteSelect">Site</label>
+        <select id="grantSiteSelect"></select>
+      </div>
+      <div class="field-row column">
+        <label for="grantPortSelect">Port</label>
+        <select id="grantPortSelect"></select>
+      </div>
+      <input type="hidden" id="grantGroupId" />
+      <span class="field-error" id="grantError"></span>
+      <div class="modal-actions">
+        <button id="cancelGrantBtn" class="secondary">Cancel</button>
+        <button id="saveGrantBtn" class="primary">Add Grant</button>
       </div>
     </div>
   </div>

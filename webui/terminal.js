@@ -1,11 +1,11 @@
 'use strict';
 
+const loginScreen = document.getElementById('loginScreen');
 const pickerScreen = document.getElementById('pickerScreen');
-const disabledScreen = document.getElementById('disabledScreen');
 const terminalScreen = document.getElementById('terminalScreen');
 
 function showScreen(el) {
-  [pickerScreen, disabledScreen].forEach((s) => s.classList.remove('active'));
+  [loginScreen, pickerScreen].forEach((s) => s.classList.remove('active'));
   if (el === terminalScreen) {
     terminalScreen.style.display = 'flex';
   } else {
@@ -20,6 +20,36 @@ async function apiGet(url) {
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
+
+async function apiPost(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+document.getElementById('terminalLoginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('terminalLoginError');
+  errorEl.textContent = '';
+  try {
+    // This form is for console users only -- an admin visiting /terminal is already
+    // authenticated via the session cookie shared with the main admin UI at "/" and
+    // never sees this screen (see the boot check below).
+    await apiPost('/api/terminal/login', {
+      username: document.getElementById('terminalUsername').value.trim(),
+      password: document.getElementById('terminalPassword').value
+    });
+    await showPicker();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  }
+});
+
+document.getElementById('pickerSignOutBtn').addEventListener('click', async () => {
+  await apiPost('/api/terminal/logout').catch(() => {});
+  window.location.reload();
+});
 
 async function showPicker() {
   const errorEl = document.getElementById('pickerError');
@@ -91,13 +121,13 @@ document.getElementById('terminalDisconnectBtn').addEventListener('click', () =>
 
 (async () => {
   try {
-    const session = await apiGet('/api/session');
+    const session = await apiGet('/api/terminal/session');
     if (!session.authenticated) {
-      showScreen(disabledScreen);
+      showScreen(loginScreen);
       return;
     }
     await showPicker();
   } catch {
-    showScreen(disabledScreen);
+    showScreen(loginScreen);
   }
 })();
