@@ -43,6 +43,7 @@ function escapeHtml(str) {
 }
 
 const loginScreen = document.getElementById('loginScreen');
+const totpScreen = document.getElementById('totpScreen');
 const forceChangeScreen = document.getElementById('forceChangeScreen');
 const appRoot = document.getElementById('appRoot');
 
@@ -93,6 +94,11 @@ document.getElementById('savePasswordPolicyBtn').addEventListener('click', async
 async function boot() {
   await loadPasswordPolicy();
   const session = await api.get('/api/session');
+  if (session.needsTotp) {
+    show(totpScreen);
+    document.body.classList.remove('app-mode');
+    return;
+  }
   if (!session.authenticated) {
     show(loginScreen);
     document.body.classList.remove('app-mode');
@@ -101,6 +107,18 @@ async function boot() {
   if (session.mustChangePassword) {
     show(forceChangeScreen);
     document.body.classList.remove('app-mode');
+    return;
+  }
+  document.body.classList.add('app-mode');
+  show(appRoot);
+  await initApp();
+}
+
+// Shared by the password-only login and the post-2FA login -- both return the same
+// { mustChangePassword } shape once the session is actually established.
+async function completeLogin(result) {
+  if (result.mustChangePassword) {
+    show(forceChangeScreen);
     return;
   }
   document.body.classList.add('app-mode');
@@ -118,15 +136,29 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       password: document.getElementById('loginPassword').value
     });
     hide(loginScreen);
-    if (result.mustChangePassword) {
-      show(forceChangeScreen);
+    if (result.needsTotp) {
+      document.getElementById('totpCode').value = '';
+      show(totpScreen);
       return;
     }
-    document.body.classList.add('app-mode');
-    show(appRoot);
-    await initApp();
+    await completeLogin(result);
   } catch (err) {
     errorEl.textContent = 'Invalid username or password.';
+  }
+});
+
+document.getElementById('totpForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('totpError');
+  errorEl.textContent = '';
+  try {
+    const result = await api.post('/api/login-totp', { token: document.getElementById('totpCode').value.trim() });
+    hide(totpScreen);
+    await completeLogin(result);
+  } catch (err) {
+    errorEl.textContent = err.message === 'invalid_code' ? 'Wrong code. Try again.' : err.message;
+    document.getElementById('totpCode').value = '';
+    document.getElementById('totpCode').focus();
   }
 });
 
@@ -591,6 +623,84 @@ async function loadHostKeyFingerprint() {
   document.getElementById('hostKeyFingerprint').textContent = fingerprint;
 }
 
+// ---------- Two-factor auth (My Account) ----------
+function setTotpStatusUi(enabled) {
+  const pill = document.getElementById('totpStatusPill');
+  const text = document.getElementById('totpStatusText');
+  pill.classList.toggle('running', enabled);
+  text.textContent = enabled ? 'Enabled' : 'Disabled';
+  document.getElementById('enableTotpBtn').hidden = enabled;
+  document.getElementById('disableTotpBtn').hidden = !enabled;
+  document.getElementById('totpSetupPanel').hidden = true;
+  document.getElementById('totpDisablePanel').hidden = true;
+}
+
+async function loadTotpStatus() {
+  const session = await api.get('/api/session');
+  setTotpStatusUi(!!session.totpEnabled);
+}
+
+document.getElementById('enableTotpBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('totpSetupMsg');
+  msg.textContent = '';
+  try {
+    const { secret, otpauthUrl } = await api.post('/api/admin-2fa/setup');
+    document.getElementById('totpSecretText').textContent = secret;
+    document.getElementById('totpConfirmCode').value = '';
+    window.renderTotpQr(document.getElementById('totpQrContainer'), otpauthUrl);
+    document.getElementById('totpSetupPanel').hidden = false;
+    document.getElementById('totpDisablePanel').hidden = true;
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('cancelTotpSetupBtn').addEventListener('click', () => {
+  document.getElementById('totpSetupPanel').hidden = true;
+  document.getElementById('totpSetupMsg').textContent = '';
+});
+
+document.getElementById('confirmTotpBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('totpSetupMsg');
+  msg.textContent = '';
+  const token = document.getElementById('totpConfirmCode').value.trim();
+  try {
+    await api.post('/api/admin-2fa/confirm', { token });
+    await loadTotpStatus();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Two-factor authentication is now enabled.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('disableTotpBtn').addEventListener('click', () => {
+  document.getElementById('totpDisableCode').value = '';
+  document.getElementById('totpDisablePanel').hidden = false;
+  document.getElementById('totpSetupPanel').hidden = true;
+});
+
+document.getElementById('cancelTotpDisableBtn').addEventListener('click', () => {
+  document.getElementById('totpDisablePanel').hidden = true;
+  document.getElementById('totpSetupMsg').textContent = '';
+});
+
+document.getElementById('confirmDisableTotpBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('totpSetupMsg');
+  msg.textContent = '';
+  const token = document.getElementById('totpDisableCode').value.trim();
+  try {
+    await api.post('/api/admin-2fa/disable', { token });
+    await loadTotpStatus();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Two-factor authentication is now disabled.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
 // ---------- Log / live events ----------
 async function loadLogHistory() {
   const lines = await api.get('/api/log');
@@ -619,6 +729,7 @@ async function initApp() {
   await loadGroups();
   await loadUsers();
   await loadMyUsername();
+  await loadTotpStatus();
   await loadHostKeyFingerprint();
   renderSessions(await api.get('/api/sessions'));
   await loadLogHistory();

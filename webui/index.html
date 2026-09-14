@@ -20,6 +20,18 @@
     </form>
   </div>
 
+  <!-- Second factor: shown after a correct password when the account has 2FA enabled -->
+  <div class="auth-screen" id="totpScreen">
+    <form class="auth-card" id="totpForm">
+      <h1>Two-Factor Authentication</h1>
+      <p class="hint">Enter the 6-digit code from your authenticator app.</p>
+      <label>Code</label>
+      <input type="text" id="totpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required />
+      <div class="auth-error" id="totpError"></div>
+      <button type="submit" class="primary">Verify</button>
+    </form>
+  </div>
+
   <!-- Forced password change -->
   <div class="auth-screen" id="forceChangeScreen">
     <form class="auth-card" id="forceChangeForm">
@@ -129,6 +141,50 @@
           <button id="changeAdminPasswordBtn">Change Password</button>
         </div>
         <div class="auth-error" id="adminPasswordMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Two-Factor Authentication</h2>
+        <p class="hint">Adds a second step at login: a 6-digit code from an authenticator app (Google Authenticator, Authy, 1Password, etc.), on top of your password. Optional, off by default.</p>
+        <div class="field-row">
+          <span>Status</span>
+          <span class="status-pill" id="totpStatusPill">
+            <span class="dot"></span>
+            <span id="totpStatusText">Disabled</span>
+          </span>
+          <button id="enableTotpBtn" class="primary">Enable 2FA</button>
+          <button id="disableTotpBtn" class="danger" hidden>Disable 2FA</button>
+        </div>
+
+        <div id="totpSetupPanel" hidden>
+          <p class="hint">Scan this with your authenticator app, or enter the code manually.</p>
+          <div id="totpQrContainer"></div>
+          <div class="field-row column">
+            <label>Manual entry code</label>
+            <code id="totpSecretText"></code>
+          </div>
+          <div class="field-row column">
+            <label for="totpConfirmCode">Enter the 6-digit code to confirm</label>
+            <input type="text" id="totpConfirmCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
+          </div>
+          <div class="field-row">
+            <button id="confirmTotpBtn" class="primary">Confirm &amp; Enable</button>
+            <button id="cancelTotpSetupBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div id="totpDisablePanel" hidden>
+          <div class="field-row column">
+            <label for="totpDisableCode">Enter your current 6-digit code to disable 2FA</label>
+            <input type="text" id="totpDisableCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
+          </div>
+          <div class="field-row">
+            <button id="confirmDisableTotpBtn" class="danger">Confirm Disable</button>
+            <button id="cancelTotpDisableBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div class="auth-error" id="totpSetupMsg"></div>
       </div>
 
       <div class="panel">
@@ -307,6 +363,7 @@
     </div>
   </div>
 
+  <script type="module" src="qrcode-bridge.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
