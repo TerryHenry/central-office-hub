@@ -237,6 +237,32 @@
         <p class="hint" id="updateProgress"></p>
         <p><a href="https://github.com/TerryHenry/central-office-hub/releases" target="_blank" rel="noopener">View all releases on GitHub</a></p>
       </div>
+
+      <div class="panel">
+        <h2>Backup</h2>
+        <p class="hint">Covers sites/ports, groups, console users, admin accounts (including password hashes), and enrollment tokens. Store downloaded backups somewhere secure; they contain credential data.</p>
+        <div class="field-row">
+          <label for="includeHostKeyOnBackup">Include SSH host key</label>
+          <input type="checkbox" id="includeHostKeyOnBackup" />
+          <span class="hint">Off by default. Lets a restore fully reproduce this hub, including the same host-key fingerprint edge boxes may have pinned &mdash; but the file will contain an SSH private key.</span>
+        </div>
+        <div class="field-row">
+          <button id="downloadBackupBtn" class="primary">Download Backup</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Restore</h2>
+        <p class="hint">Replaces the entire current configuration with the contents of a backup file &mdash; sites, groups, users, admin accounts, everything.</p>
+        <div class="field-row column">
+          <label for="restoreFile">Backup file</label>
+          <input type="file" id="restoreFile" accept="application/json" />
+        </div>
+        <div class="field-row">
+          <button id="restoreBtn" class="danger">Restore from Backup</button>
+        </div>
+        <div class="auth-error" id="restoreMsg"></div>
+      </div>
     </div>
   </div>
 
@@ -360,21 +386,21 @@
 
   <!-- Add grant modal -->
   <div class="modal-backdrop" id="grantModalBackdrop">
-    <div class="modal">
+    <div class="modal" style="width: 520px;">
       <h3>Grant Port Access</h3>
-      <div class="field-row column">
-        <label for="grantSiteSelect">Site</label>
-        <select id="grantSiteSelect"></select>
+      <p class="hint">Check individual ports, or check a site's own box to grant every port on it.</p>
+      <div class="field-row">
+        <label style="min-width: unset; display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="grantSelectAllSites" />
+          Select all sites (every port on every site)
+        </label>
       </div>
-      <div class="field-row column">
-        <label for="grantPortSelect">Port</label>
-        <select id="grantPortSelect"></select>
-      </div>
+      <div id="grantSiteTree" class="check-list" style="max-height: 320px;"></div>
       <input type="hidden" id="grantGroupId" />
       <span class="field-error" id="grantError"></span>
       <div class="modal-actions">
         <button id="cancelGrantBtn" class="secondary">Cancel</button>
-        <button id="saveGrantBtn" class="primary">Add Grant</button>
+        <button id="saveGrantBtn" class="primary">Add Selected</button>
       </div>
     </div>
   </div>

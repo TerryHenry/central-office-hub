@@ -492,7 +492,7 @@ async function loadGroups() {
     const actionsCell = tr.lastElementChild;
     const grantBtn = document.createElement('button');
     grantBtn.textContent = '+ Grant';
-    grantBtn.addEventListener('click', () => openGrantModal(group.id, sites));
+    grantBtn.addEventListener('click', () => openGrantModal(group, sites));
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
     delBtn.className = 'danger';
@@ -530,20 +530,73 @@ document.getElementById('saveGroupBtn').addEventListener('click', async () => {
   }
 });
 
-function openGrantModal(groupId, sites) {
-  document.getElementById('grantGroupId').value = groupId;
+function openGrantModal(group, sites) {
+  document.getElementById('grantGroupId').value = group.id;
   document.getElementById('grantError').textContent = '';
-  const siteSelect = document.getElementById('grantSiteSelect');
-  siteSelect.innerHTML = sites.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-  const fillPorts = () => {
-    const site = sites.find((s) => s.id === siteSelect.value);
-    const portSelect = document.getElementById('grantPortSelect');
-    portSelect.innerHTML = site
-      ? site.ports.map((p) => `<option value="${p.id}">${escapeHtml(p.label)}</option>`).join('')
-      : '';
+  document.getElementById('grantSelectAllSites').checked = false;
+
+  const tree = document.getElementById('grantSiteTree');
+  tree.innerHTML = '';
+  if (sites.length === 0) {
+    tree.innerHTML = '<span class="hint">No sites enrolled yet.</span>';
+  }
+  const isGranted = (siteId, portId) => group.grants.some((g) => g.siteId === siteId && g.portId === portId);
+
+  for (const site of sites) {
+    const block = document.createElement('div');
+    block.className = 'grant-site-block';
+
+    const siteLabel = document.createElement('label');
+    const siteCheck = document.createElement('input');
+    siteCheck.type = 'checkbox';
+    siteCheck.className = 'grant-site-check';
+    siteCheck.dataset.site = site.id;
+    siteLabel.appendChild(siteCheck);
+    siteLabel.appendChild(document.createTextNode(site.name));
+    block.appendChild(siteLabel);
+
+    const portsEl = document.createElement('div');
+    portsEl.className = 'grant-ports';
+    if (site.ports.length === 0) {
+      portsEl.innerHTML = '<span class="hint">no ports yet</span>';
+    }
+    const portChecks = [];
+    for (const port of site.ports) {
+      const portLabel = document.createElement('label');
+      const portCheck = document.createElement('input');
+      portCheck.type = 'checkbox';
+      portCheck.className = 'grant-port-check';
+      portCheck.dataset.site = site.id;
+      portCheck.dataset.port = port.id;
+      if (isGranted(site.id, port.id)) {
+        portCheck.checked = true;
+        portCheck.disabled = true;
+        portLabel.title = 'Already granted';
+      }
+      portChecks.push(portCheck);
+      portLabel.appendChild(portCheck);
+      portLabel.appendChild(document.createTextNode(`${port.label}${portCheck.disabled ? ' (already granted)' : ''}`));
+      portsEl.appendChild(portLabel);
+    }
+    block.appendChild(portsEl);
+    tree.appendChild(block);
+
+    // Checking a site checks every one of its (not-yet-granted) ports; unchecking
+    // clears them. The site checkbox itself isn't submitted -- only real port checks are.
+    siteCheck.addEventListener('change', () => {
+      for (const pc of portChecks) {
+        if (!pc.disabled) pc.checked = siteCheck.checked;
+      }
+    });
+  }
+
+  document.getElementById('grantSelectAllSites').onchange = (e) => {
+    tree.querySelectorAll('.grant-site-check').forEach((cb) => {
+      cb.checked = e.target.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
   };
-  siteSelect.onchange = fillPorts;
-  fillPorts();
+
   document.getElementById('grantModalBackdrop').classList.add('open');
 }
 document.getElementById('cancelGrantBtn').addEventListener('click', () => {
@@ -551,14 +604,16 @@ document.getElementById('cancelGrantBtn').addEventListener('click', () => {
 });
 document.getElementById('saveGrantBtn').addEventListener('click', async () => {
   const groupId = document.getElementById('grantGroupId').value;
-  const siteId = document.getElementById('grantSiteSelect').value;
-  const portId = document.getElementById('grantPortSelect').value;
-  if (!siteId || !portId) {
-    document.getElementById('grantError').textContent = 'This site has no ports yet.';
+  const grants = Array.from(document.querySelectorAll('#grantSiteTree .grant-port-check:checked:not(:disabled)')).map((cb) => ({
+    siteId: cb.dataset.site,
+    portId: cb.dataset.port
+  }));
+  if (grants.length === 0) {
+    document.getElementById('grantError').textContent = 'Check at least one port (or a site) first.';
     return;
   }
   try {
-    await api.post(`/api/groups/${groupId}/grants`, { siteId, portId });
+    await api.post(`/api/groups/${groupId}/grants/bulk`, { grants });
     document.getElementById('grantModalBackdrop').classList.remove('open');
     await loadGroups();
   } catch (err) {
@@ -821,6 +876,40 @@ document.getElementById('rollbackUpdateBtn').addEventListener('click', () => {
     'Roll back to the previous version? This restarts the service and briefly disconnects active tunnels and sessions.',
     'Starting rollback…'
   );
+});
+
+// ---------- Backup / restore ----------
+document.getElementById('downloadBackupBtn').addEventListener('click', () => {
+  const includeHostKey = document.getElementById('includeHostKeyOnBackup').checked;
+  window.location.href = `/api/backup${includeHostKey ? '?includeHostKey=1' : ''}`;
+});
+
+document.getElementById('restoreBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('restoreMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = '';
+  const fileInput = document.getElementById('restoreFile');
+  const file = fileInput.files[0];
+  if (!file) {
+    msg.textContent = 'Choose a backup file first.';
+    return;
+  }
+  if (!confirm('This replaces all current sites, groups, users, and admin accounts with the contents of the backup file. Continue?')) {
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/restore', { method: 'POST', body: formData });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    msg.style.color = 'var(--ok)';
+    msg.textContent = body.note ? `Restored. ${body.note}` : 'Restored. Reloading…';
+    fileInput.value = '';
+    setTimeout(() => window.location.reload(), 1500);
+  } catch (err) {
+    msg.textContent = err.message;
+  }
 });
 
 // ---------- Log / live events ----------
