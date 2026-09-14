@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Central Office</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Login screen -->
+  <div class="auth-screen active" id="loginScreen">
+    <form class="auth-card" id="loginForm">
+      <h1>Central Office</h1>
+      <label>Username</label>
+      <input type="text" id="loginUsername" required />
+      <label>Password</label>
+      <input type="password" id="loginPassword" required />
+      <div class="auth-error" id="loginError"></div>
+      <button type="submit" class="primary">Sign In</button>
+    </form>
+  </div>
+
+  <!-- Forced password change -->
+  <div class="auth-screen" id="forceChangeScreen">
+    <form class="auth-card" id="forceChangeForm">
+      <h1>Change the default password</h1>
+      <p class="hint">This account is still using the default password. Choose a new one to continue.</p>
+      <label>New password <span class="hint" id="forceChangePasswordHint"></span></label>
+      <input type="password" id="forceChangePassword" minlength="8" required />
+      <label>Confirm password</label>
+      <input type="password" id="forceChangePasswordConfirm" minlength="8" required />
+      <div class="auth-error" id="forceChangeError"></div>
+      <button type="submit" class="primary">Set Password &amp; Continue</button>
+    </form>
+  </div>
+
+  <!-- Main app -->
+  <div class="app" id="appRoot">
+    <div class="titlebar">
+      <div class="titlebar-title">Central Office</div>
+      <button id="logoutBtn" class="secondary">Sign Out</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="sites">Sites</button>
+      <button class="tab-btn" data-tab="sessions">Sessions</button>
+      <button class="tab-btn" data-tab="log">Log</button>
+      <button class="tab-btn" data-tab="account">Account</button>
+    </div>
+
+    <div class="tab-content active" id="tab-sites">
+      <div class="panel">
+        <h2>Sites</h2>
+        <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Ports are entered here by hand for now &mdash; the id must match a real port already configured on that edge box's Serial Ports tab.</p>
+        <table class="data-table" id="sitesTable">
+          <thead><tr><th>Site</th><th>Status</th><th>Ports</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addSiteBtn">+ Add Site</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-sessions">
+      <div class="panel">
+        <h2>Active Web Console Sessions</h2>
+        <table class="data-table" id="sessionsTable">
+          <thead><tr><th>User</th><th>Connected To</th><th>Since</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-log">
+      <div class="panel">
+        <h2>Server Log</h2>
+        <pre class="code-block log-view" id="logView"></pre>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-account">
+      <div class="panel">
+        <h2>My Account</h2>
+        <p class="hint">Signed in as <strong id="myUsername">&mdash;</strong>.</p>
+        <div class="field-row column">
+          <label for="newAdminPassword">New password <span class="hint" id="newAdminPasswordHint"></span></label>
+          <input type="password" id="newAdminPassword" minlength="8" />
+        </div>
+        <div class="field-row column">
+          <label for="newAdminPasswordConfirm">Confirm new password</label>
+          <input type="password" id="newAdminPasswordConfirm" minlength="8" />
+        </div>
+        <div class="field-row">
+          <button id="changeAdminPasswordBtn">Change Password</button>
+        </div>
+        <div class="auth-error" id="adminPasswordMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Password Policy</h2>
+        <p class="hint">Applies to this admin account. Edge-box sites authenticate by key, not password, so this doesn't touch them.</p>
+        <div class="field-row">
+          <label for="policyMinLength">Minimum length</label>
+          <input type="number" id="policyMinLength" min="8" max="64" style="width: 6em" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireMixedCase">Require upper &amp; lowercase letters</label>
+          <input type="checkbox" id="policyRequireMixedCase" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireDigit">Require a digit</label>
+          <input type="checkbox" id="policyRequireDigit" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireSymbol">Require a symbol</label>
+          <input type="checkbox" id="policyRequireSymbol" />
+        </div>
+        <div class="field-row">
+          <label for="policyCheckBreached">Reject common/breached passwords</label>
+          <input type="checkbox" id="policyCheckBreached" />
+        </div>
+        <div class="field-row">
+          <button id="savePasswordPolicyBtn">Save Settings</button>
+        </div>
+        <div class="auth-error" id="passwordPolicyMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Hub SSH Host Key</h2>
+        <p class="hint">Shown here so you can verify it out-of-band before trusting a connection to this hub.</p>
+        <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add site modal -->
+  <div class="modal-backdrop" id="siteModalBackdrop">
+    <div class="modal">
+      <h3>Add Site</h3>
+      <div class="field-row column">
+        <label for="siteName">Site name</label>
+        <input type="text" id="siteName" placeholder="e.g. Building 3 Wiring Closet" />
+        <span class="field-error" id="siteNameError"></span>
+      </div>
+      <div class="field-row column">
+        <label for="sitePublicKey">Tunnel public key</label>
+        <textarea id="sitePublicKey" rows="3" placeholder="ssh-ed25519 AAAA... (from the edge box's Network tab)"></textarea>
+        <span class="field-error" id="sitePublicKeyError"></span>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelSiteBtn" class="secondary">Cancel</button>
+        <button id="saveSiteBtn" class="primary">Add Site</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add port modal -->
+  <div class="modal-backdrop" id="portModalBackdrop">
+    <div class="modal">
+      <h3>Add Port</h3>
+      <p class="hint">The port id must match exactly, byte for byte, the id of a real port already configured on that edge box (visible via its own admin API for now &mdash; Phase 1 doesn't report this automatically yet).</p>
+      <div class="field-row column">
+        <label for="portIdInput">Port id</label>
+        <input type="text" id="portIdInput" placeholder="the edge box's port id" />
+        <span class="field-error" id="portIdError"></span>
+      </div>
+      <div class="field-row column">
+        <label for="portLabelInput">Label</label>
+        <input type="text" id="portLabelInput" placeholder="e.g. Core Switch Console" />
+        <span class="field-error" id="portLabelError"></span>
+      </div>
+      <input type="hidden" id="portSiteId" />
+      <div class="modal-actions">
+        <button id="cancelPortBtn" class="secondary">Cancel</button>
+        <button id="savePortBtn" class="primary">Add Port</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

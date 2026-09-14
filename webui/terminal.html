@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Central Office — Console</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/css/xterm.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app-mode">
+  <div class="auth-screen active" id="pickerScreen">
+    <form class="auth-card" id="pickerForm" style="width: 420px;">
+      <h1>Central Office Console</h1>
+      <div class="auth-error" id="pickerError"></div>
+      <div id="choiceList" style="display: flex; flex-direction: column; gap: 6px;"></div>
+      <p class="hint" id="pickerEmpty" style="display: none;">No connected sites/ports right now.</p>
+    </form>
+  </div>
+
+  <div class="auth-screen" id="disabledScreen">
+    <div class="auth-card">
+      <h1>Not signed in</h1>
+      <p class="hint">Sign in to the <a href="/">admin UI</a> first, then come back here.</p>
+    </div>
+  </div>
+
+  <div class="terminal-wrap" id="terminalScreen" style="display: none;">
+    <div class="terminal-header">
+      <span class="title" id="terminalTitle">Connecting…</span>
+      <button id="terminalDisconnectBtn" class="secondary">Disconnect</button>
+    </div>
+    <div id="xtermContainer"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/lib/xterm.min.js"></script>
+  <script src="terminal.js"></script>
+</body>
+</html>
