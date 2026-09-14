@@ -1,0 +1,21 @@
+[Unit]
+Description=Central Office (fleet management hub for Serial Killer Terminal Server)
+After=network.target
+# If a bad update (or anything else) leaves the app crashing on startup, give up after 3
+# restarts within 60s instead of crash-looping forever -- the unit ends up "failed" and
+# stays there for an admin to investigate over SSH, rather than spinning indefinitely.
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/central-office
+ExecStart=/usr/bin/node /opt/central-office/server.js
+Restart=on-failure
+RestartSec=3
+User=central-office
+Group=central-office
+Environment=CO_DATA_DIR=/opt/central-office/data
+
+[Install]
+WantedBy=multi-user.target

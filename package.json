@@ -1,6 +1,6 @@
 {
   "name": "central-office",
-  "version": "0.1.0",
+  "version": "0926-1",
   "description": "Central Office — hub for managing a fleet of Serial Killer Terminal Server appliances over encrypted tunnels.",
   "main": "server.js",
   "private": true,

@@ -1,0 +1,15 @@
+[Unit]
+Description=Central Office one-time setup (installs Node.js and app dependencies)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/opt/central-office/data/.setup-complete
+
+[Service]
+Type=oneshot
+ExecStart=/opt/central-office/provisioning/setup.sh
+TimeoutStartSec=3600
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

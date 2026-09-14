@@ -221,6 +221,21 @@
         <p class="hint">Shown here so you can verify it out-of-band before trusting a connection to this hub.</p>
         <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
       </div>
+
+      <div class="panel">
+        <h2>Version &amp; Updates</h2>
+        <p class="hint">Running version <strong id="currentVersion">&hellip;</strong>. Applying an update briefly restarts this service &mdash; active tunnels reconnect on their own, and web/SSH sessions disconnect and need to reconnect.</p>
+        <div class="field-row">
+          <button id="checkUpdateBtn">Check for Updates</button>
+        </div>
+        <p class="hint" id="updateStatus"></p>
+        <div class="field-row">
+          <button id="applyUpdateBtn" class="primary" hidden>Apply Update</button>
+          <button id="rollbackUpdateBtn" class="danger" hidden>Roll Back to Previous Version</button>
+        </div>
+        <p class="hint" id="updateProgress"></p>
+        <p><a href="https://github.com/TerryHenry/central-office-hub/releases" target="_blank" rel="noopener">View all releases on GitHub</a></p>
+      </div>
     </div>
   </div>
 
