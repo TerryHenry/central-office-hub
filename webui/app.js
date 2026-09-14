@@ -306,10 +306,30 @@ function openSiteRestoreModal(site) {
   document.getElementById('siteRestoreSiteName').textContent = site.name;
   document.getElementById('siteRestoreFile').value = '';
   document.getElementById('siteRestoreError').textContent = '';
+  const storedRow = document.getElementById('siteRestoreStoredRow');
+  if (site.lastBackup) {
+    storedRow.style.display = '';
+    document.getElementById('siteRestoreStoredInfo').textContent =
+      `Taken ${new Date(site.lastBackup.takenAt).toLocaleString()} -- no upload needed, the hub already has this.`;
+  } else {
+    storedRow.style.display = 'none';
+  }
   document.getElementById('siteRestoreModalBackdrop').classList.add('open');
 }
 document.getElementById('cancelSiteRestoreBtn').addEventListener('click', () => {
   document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSiteRestoreStoredBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteRestoreSiteId').value;
+  const errEl = document.getElementById('siteRestoreError');
+  if (!confirm('Restore this site\'s own last stored backup? This replaces its entire configuration the next time it heartbeats. Continue?')) return;
+  try {
+    await api.post(`/api/sites/${siteId}/backup/restore-stored`);
+    document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
+    alert('Restore queued -- it applies on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
 });
 document.getElementById('saveSiteRestoreBtn').addEventListener('click', async () => {
   const siteId = document.getElementById('siteRestoreSiteId').value;
