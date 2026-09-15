@@ -219,11 +219,18 @@ async function loadSites() {
     const backupInfo = site.lastBackup
       ? `<span class="hint">${new Date(site.lastBackup.takenAt).toLocaleDateString()}</span>`
       : '<span class="hint">none yet</span>';
+    let versionInfo = site.reportedVersion ? escapeHtml(site.reportedVersion) : '<span class="hint">&mdash;</span>';
+    if (site.reportedVersion && site.updateAvailable) {
+      const url = site.latestEdgeVersionUrl ? escapeHtml(site.latestEdgeVersionUrl) : '#';
+      versionInfo += `<br><a href="${url}" target="_blank" rel="noopener" class="pill warn"><span class="dot"></span>Update: ${escapeHtml(site.latestEdgeVersion)}</a>`;
+    } else if (site.reportedVersion && site.latestEdgeVersion) {
+      versionInfo += '<br><span class="pill ok"><span class="dot"></span>Up to date</span>';
+    }
     tr.innerHTML = `
       <td><input type="checkbox" class="site-select" data-site="${site.id}" /></td>
       <td>${escapeHtml(site.name)}</td>
       <td>${statusPill(site.connected)}</td>
-      <td>${site.reportedVersion ? escapeHtml(site.reportedVersion) : '<span class="hint">&mdash;</span>'}</td>
+      <td>${versionInfo}</td>
       <td>${lastSeen}</td>
       <td>${backupInfo}</td>
       <td>${portsList}</td>

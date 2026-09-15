@@ -10,6 +10,7 @@
   --danger: #e5534b;
   --danger-border: rgba(229,83,75,0.4);
   --ok: #3fb950;
+  --warn: #d9a52a;
   --overlay-1: rgba(255,255,255,0.06);
   --overlay-2: rgba(255,255,255,0.08);
   --overlay-3: rgba(255,255,255,0.14);
@@ -78,6 +79,7 @@ button.danger { color: var(--danger); border-color: var(--danger-border); }
 .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .pill.ok { background: rgba(63, 185, 80, 0.14); color: var(--ok); }
 .pill.mute { background: var(--overlay-1); color: var(--text-dim); }
+.pill.warn { background: rgba(217, 165, 42, 0.14); color: var(--warn); }
 
 code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overlay-2); border-radius: 4px; padding: 0.05em 0.4em; word-break: break-all; }
 .code-block { background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: ui-monospace, "SF Mono", monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; color: var(--text-dim); }
