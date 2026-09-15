@@ -117,6 +117,22 @@ SETUP_STATUS=\$?
 sleep 3
 if [ "\$SETUP_STATUS" -eq 0 ] && systemctl is-active --quiet central-office.service; then
   echo "=== Provisioning succeeded: \$(date -u) ==="
+
+  # This disk is about to be shipped as a reusable template, deployed to hypervisors
+  # this build never saw. cloud-init keys its "have I already initialized this
+  # instance" cache off instance-id, which is fixed (see meta-data above) -- left as
+  # is, every VM cloned from this image would see that same cached state and skip
+  # re-running network/SSH-host-key setup for its own actual NIC on first real boot,
+  # since cloud-init believes it's already configured (that's what silently produced
+  # a VM with no IP address after import elsewhere: it kept the build environment's
+  # cached DHCP config for an interface that doesn't exist on the new hypervisor,
+  # instead of detecting the real one). "cloud-init clean" drops that cache so the
+  # next boot re-detects everything from scratch, and clearing machine-id avoids
+  # every clone sharing one systemd/dbus identity.
+  echo "==> Resetting cloud-init and machine identity for a clean first boot elsewhere..."
+  cloud-init clean --logs --seed
+  truncate -s 0 /etc/machine-id
+
   echo "BUILD_OK" > /dev/console
 else
   echo "=== Provisioning FAILED (setup exit \$SETUP_STATUS, service active: \$(systemctl is-active central-office.service || true)) ===" >&2
