@@ -268,8 +268,18 @@ async function loadSites() {
       await api.post(`/api/sites/${site.id}/backup/request`);
       alert(`A config backup was requested from "${site.name}" -- it's sent on the box's next heartbeat.`);
     });
+    const syncAdminsBtn = document.createElement('button');
+    syncAdminsBtn.textContent = 'Sync Admins';
+    syncAdminsBtn.className = 'danger';
+    syncAdminsBtn.style.marginLeft = '6px';
+    syncAdminsBtn.addEventListener('click', async () => {
+      if (!confirm(`Replace every local admin account on "${site.name}" with this hub's own admin accounts? Any admin login not from the hub will stop working on that box. Applies on its next heartbeat.`)) return;
+      await api.post(`/api/sites/${site.id}/sync-admins`);
+      alert(`An admin sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
+    });
     actionsCell.appendChild(queueBtn);
     actionsCell.appendChild(requestBackupBtn);
+    actionsCell.appendChild(syncAdminsBtn);
     if (site.lastBackup) {
       const downloadBackupBtn = document.createElement('button');
       downloadBackupBtn.textContent = 'Download Backup';
@@ -318,6 +328,17 @@ document.getElementById('bulkQueueUpdateBtn').addEventListener('click', async ()
   if (!confirm(`Upgrade ${siteIds.length} site${siteIds.length === 1 ? '' : 's'}? Each applies on its own next heartbeat.`)) return;
   const result = await api.post('/api/sites/queue-update/bulk', { siteIds });
   alert(`Queued an upgrade for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+});
+
+document.getElementById('bulkSyncAdminsBtn').addEventListener('click', async () => {
+  const siteIds = Array.from(document.querySelectorAll('#sitesTable .site-select:checked')).map((cb) => cb.dataset.site);
+  if (siteIds.length === 0) {
+    alert('Select at least one site first.');
+    return;
+  }
+  if (!confirm(`Replace every local admin account on ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} with this hub's own admin accounts? Any admin login not from the hub will stop working on those boxes. Each applies on its own next heartbeat.`)) return;
+  const result = await api.post('/api/sites/sync-admins/bulk', { siteIds });
+  alert(`Queued an admin sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
 });
 
 function openSiteRestoreModal(site) {
