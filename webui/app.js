@@ -205,6 +205,24 @@ function statusPill(connected) {
     : '<span class="pill mute"><span class="dot"></span>Disconnected</span>';
 }
 
+/** Reflects what the box's own last heartbeat reported about its local SSH/web console --
+ * only surfaces anything when something is actually disabled, so a normal site (both
+ * reachable, the default) doesn't get a pill on every row. undefined means the box
+ * hasn't reported this yet (older version, or never heartbeated) -- stay silent rather
+ * than guess. */
+function localAccessPill(site) {
+  const ssh = site.edgeSshEnabled;
+  const web = site.edgeWebTerminalEnabled;
+  if (ssh === false && web === false) {
+    return '<br><span class="pill ok" title="Local SSH and web console are both disabled on this box"><span class="dot"></span>Local access locked down</span>';
+  }
+  const disabled = [];
+  if (ssh === false) disabled.push('SSH');
+  if (web === false) disabled.push('web console');
+  if (disabled.length === 0) return '';
+  return `<br><span class="pill mute" title="Local ${disabled.join(' and ')} access is disabled on this box"><span class="dot"></span>Local ${escapeHtml(disabled.join(' + '))} disabled</span>`;
+}
+
 async function loadSites() {
   const sites = await api.get('/api/sites');
   const tbody = document.querySelector('#sitesTable tbody');
@@ -229,7 +247,7 @@ async function loadSites() {
     tr.innerHTML = `
       <td><input type="checkbox" class="site-select" data-site="${site.id}" /></td>
       <td>${escapeHtml(site.name)}</td>
-      <td>${statusPill(site.connected)}</td>
+      <td>${statusPill(site.connected)}${localAccessPill(site)}</td>
       <td>${versionInfo}</td>
       <td>${lastSeen}</td>
       <td>${backupInfo}</td>
