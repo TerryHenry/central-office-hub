@@ -93,6 +93,39 @@ retry() {
 }
 
 export DEBIAN_FRONTEND=noninteractive
+
+# Debian's genericcloud image ships the trimmed "cloud" kernel flavor, built for
+# KVM/virtio-style environments -- it has no driver for the E1000 NIC this OVF
+# declares (which is what ESXi actually attaches on import): the PCI device
+# enumerates fine but nothing binds it, so the box never gets an IP and sits at
+# "systemd-networkd-wait-online.service ... no limit" forever (looks like a hang on
+# the hypervisor's console, but the OS itself boots and everything else including
+# sshd starts fine -- confirmed directly, not guessed, by booting this same disk
+# with an E1000 NIC and watching it happen). The standard kernel carries broad
+# hardware driver coverage (e1000, e1000e, vmxnet3, virtio, ...) instead, so this one
+# image works regardless of which vNIC model any given hypervisor's OVF import
+# ends up attaching.
+echo "==> Swapping the trimmed cloud kernel for the standard one (broad NIC driver coverage)..."
+retry apt-get update
+retry apt-get install -y --no-install-recommends linux-image-amd64
+OLD_KERNEL_PKGS=\$(dpkg -l | awk '/^ii/ && /linux-image.*cloud/ {print \$2}')
+if [ -n "\$OLD_KERNEL_PKGS" ]; then
+  apt-get purge -y \$OLD_KERNEL_PKGS
+fi
+apt-get autoremove --purge -y
+update-grub
+
+# VMware-guest integration -- installed here (the VM-appliance build), not in the
+# shared provisioning/setup.sh that "Option A: install on an existing host" also runs,
+# since that path may not be a VM at all. Lets ESXi/Fusion/Workstation's own VM
+# summary show this box's actual IP (otherwise undiscoverable without opening a
+# console on a headless appliance) -- harmless no-op background service on any other
+# hypervisor (VirtualBox, Proxmox/KVM, plain QEMU) this same OVA also gets imported
+# into.
+echo "==> Installing open-vm-tools (VMware guest integration)..."
+retry apt-get install -y --no-install-recommends open-vm-tools
+systemctl enable open-vm-tools.service 2>/dev/null || true
+
 mkdir -p /opt/central-office
 cd /opt/central-office
 
