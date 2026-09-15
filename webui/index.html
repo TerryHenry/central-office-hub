@@ -65,7 +65,7 @@
     <div class="tab-content active" id="tab-sites">
       <div class="panel">
         <h2>Sites</h2>
-        <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Ports can be entered here by hand, or reported automatically by a box that's in managed mode and heartbeating &mdash; whichever touched a site most recently wins.</p>
+        <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Its ports are reported automatically by heartbeat (every 30s, while it's in managed mode) &mdash; nothing to enter by hand.</p>
         <table class="data-table" id="sitesTable">
           <thead><tr><th><input type="checkbox" id="sitesSelectAll" /></th><th>Site</th><th>Status</th><th>Version</th><th>Last Seen</th><th>Backup</th><th>Ports</th><th></th></tr></thead>
           <tbody></tbody>
@@ -311,29 +311,6 @@
       <div class="modal-actions">
         <button id="cancelSiteRestoreBtn" class="secondary">Cancel</button>
         <button id="saveSiteRestoreBtn" class="danger">Queue Restore from Uploaded File</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Add port modal -->
-  <div class="modal-backdrop" id="portModalBackdrop">
-    <div class="modal">
-      <h3>Add Port</h3>
-      <p class="hint">The port id must match exactly, byte for byte, the id of a real port already configured on that edge box (visible via its own admin API for now &mdash; Phase 1 doesn't report this automatically yet).</p>
-      <div class="field-row column">
-        <label for="portIdInput">Port id</label>
-        <input type="text" id="portIdInput" placeholder="the edge box's port id" />
-        <span class="field-error" id="portIdError"></span>
-      </div>
-      <div class="field-row column">
-        <label for="portLabelInput">Label</label>
-        <input type="text" id="portLabelInput" placeholder="e.g. Core Switch Console" />
-        <span class="field-error" id="portLabelError"></span>
-      </div>
-      <input type="hidden" id="portSiteId" />
-      <div class="modal-actions">
-        <button id="cancelPortBtn" class="secondary">Cancel</button>
-        <button id="savePortBtn" class="primary">Add Port</button>
       </div>
     </div>
   </div>

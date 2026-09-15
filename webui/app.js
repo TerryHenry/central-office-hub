@@ -213,8 +213,8 @@ async function loadSites() {
   for (const site of sites) {
     const tr = document.createElement('tr');
     const portsList = site.ports.length
-      ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code>${escapeHtml(p.id)}</code> <a href="#" data-site="${site.id}" data-port="${p.id}" class="del-port">remove</a></div>`).join('')
-      : '<span class="hint">none yet</span>';
+      ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code>${escapeHtml(p.id)}</code></div>`).join('')
+      : '<span class="hint">none reported yet</span>';
     const lastSeen = site.lastSeenAt ? new Date(site.lastSeenAt).toLocaleString() : '<span class="hint">never</span>';
     const backupInfo = site.lastBackup
       ? `<span class="hint">${new Date(site.lastBackup.takenAt).toLocaleDateString()}</span>`
@@ -237,12 +237,8 @@ async function loadSites() {
       <td></td>
     `;
     const actionsCell = tr.lastElementChild;
-    const addPortBtn = document.createElement('button');
-    addPortBtn.textContent = '+ Port';
-    addPortBtn.addEventListener('click', () => openPortModal(site.id));
     const queueBtn = document.createElement('button');
     queueBtn.textContent = 'Queue Update';
-    queueBtn.style.marginLeft = '6px';
     queueBtn.addEventListener('click', async () => {
       await api.post(`/api/sites/${site.id}/queue-update`);
       alert(`An update was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
@@ -254,7 +250,6 @@ async function loadSites() {
       await api.post(`/api/sites/${site.id}/backup/request`);
       alert(`A config backup was requested from "${site.name}" -- it's sent on the box's next heartbeat.`);
     });
-    actionsCell.appendChild(addPortBtn);
     actionsCell.appendChild(queueBtn);
     actionsCell.appendChild(requestBackupBtn);
     if (site.lastBackup) {
@@ -284,13 +279,6 @@ async function loadSites() {
     actionsCell.appendChild(delBtn);
     tbody.appendChild(tr);
   }
-  tbody.querySelectorAll('.del-port').forEach((a) => {
-    a.addEventListener('click', async (e) => {
-      e.preventDefault();
-      await api.del(`/api/sites/${a.dataset.site}/ports/${a.dataset.port}`);
-      await loadSites();
-    });
-  });
 }
 
 document.getElementById('sitesSelectAll').addEventListener('change', (e) => {
@@ -384,34 +372,6 @@ document.getElementById('saveSiteBtn').addEventListener('click', async () => {
     await loadSites();
   } catch (err) {
     setFieldError('sitePublicKey', err.message);
-  }
-});
-
-function openPortModal(siteId) {
-  document.getElementById('portSiteId').value = siteId;
-  document.getElementById('portIdInput').value = '';
-  document.getElementById('portLabelInput').value = '';
-  clearFieldError('portIdInput');
-  clearFieldError('portLabelInput');
-  document.getElementById('portModalBackdrop').classList.add('open');
-}
-document.getElementById('cancelPortBtn').addEventListener('click', () => {
-  document.getElementById('portModalBackdrop').classList.remove('open');
-});
-document.getElementById('savePortBtn').addEventListener('click', async () => {
-  const siteId = document.getElementById('portSiteId').value;
-  const portId = document.getElementById('portIdInput').value.trim();
-  const label = document.getElementById('portLabelInput').value.trim();
-  let valid = true;
-  if (!portId) { setFieldError('portIdInput', 'A port id is required.'); valid = false; }
-  if (!label) { setFieldError('portLabelInput', 'A label is required.'); valid = false; }
-  if (!valid) return;
-  try {
-    await api.post(`/api/sites/${siteId}/ports`, { portId, label });
-    document.getElementById('portModalBackdrop').classList.remove('open');
-    await loadSites();
-  } catch (err) {
-    setFieldError('portIdInput', err.message);
   }
 });
 
