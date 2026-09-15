@@ -205,6 +205,23 @@ function statusPill(connected) {
     : '<span class="pill mute"><span class="dot"></span>Disconnected</span>';
 }
 
+/** Port access mode, as reported by the site's own heartbeat -- purely informational
+ * here (the hub can't enforce it, only the appliance owning the port can); matches the
+ * appliance's own terminology exactly so the two admin UIs never disagree on wording. */
+function accessLabel(access) {
+  if (access === 'shared-rw') return 'Shared (read/write)';
+  if (access === 'first-write') return 'Shared (first user read/write)';
+  if (access === 'shared-ro') return 'Shared (read-only)';
+  if (access === 'exclusive') return 'Exclusive';
+  return 'Unknown';
+}
+
+function accessPill(access) {
+  if (!access) return '';
+  const cls = access !== 'exclusive' ? 'warn' : 'mute';
+  return `<span class="pill ${cls}" title="Port access mode (reported by the site, not enforced by the hub)">${escapeHtml(accessLabel(access))}</span> `;
+}
+
 /** Reflects what the box's own last heartbeat reported about its local SSH/web console --
  * only surfaces anything when something is actually disabled, so a normal site (both
  * reachable, the default) doesn't get a pill on every row. undefined means the box
@@ -237,15 +254,222 @@ function adminsSyncPill(site) {
   return '';
 }
 
+// ---------- Fleet topology diagram (Dashboard tab) ----------
+// Ports carry their own reported `present` flag from the edge box's heartbeat when
+// available (see configStore.recordHeartbeat) and fall back to the site's tunnel state
+// for older boxes that don't report it yet -- see the per-port logic below.
+let lastTopologySites = [];
+let lastTopologyHaStatus = { configured: false };
+
+function renderTopology(sites, haStatus) {
+  lastTopologySites = sites;
+  if (haStatus !== undefined) lastTopologyHaStatus = haStatus;
+  const ha = lastTopologyHaStatus;
+  const svg = document.getElementById('topologySvg');
+  const empty = document.getElementById('topologyEmpty');
+  if (!sites.length) {
+    svg.hidden = true;
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  svg.hidden = false;
+
+  const ROW_H = 26;
+  const HUB_X = 50;
+  const SITE_X = 300;
+  const PORT_X = 560;
+  const TOP_PAD = 20;
+
+  let y = TOP_PAD;
+  const siteLayout = [];
+  for (const site of sites) {
+    const rows = Math.max(site.ports.length, 1);
+    const blockTop = y;
+    const portYs = site.ports.map((_p, i) => blockTop + i * ROW_H + ROW_H / 2);
+    const blockHeight = rows * ROW_H;
+    siteLayout.push({ site, siteY: blockTop + blockHeight / 2, portYs });
+    y += blockHeight;
+  }
+  const totalHeight = Math.max(y + TOP_PAD, 100);
+  const hubY = totalHeight / 2;
+
+  const longestLabel = sites.reduce((max, s) => {
+    max = Math.max(max, s.name.length);
+    for (const p of s.ports) max = Math.max(max, p.label.length);
+    return max;
+  }, 8);
+  const width = PORT_X + Math.min(longestLabel * 7, 280) + 40;
+
+  svg.setAttribute('viewBox', `0 0 ${width} ${totalHeight}`);
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', totalHeight);
+
+  const edge = (x1, y1, x2, y2) => {
+    const midX = (x1 + x2) / 2;
+    return `<path class="topology-edge" d="M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}" />`;
+  };
+
+  // A node's own label sits directly in the path any line leaving that node has to take
+  // (both start out moving horizontally toward higher X, same as the label). Two things
+  // fix that: (1) every edge is emitted into its own array and painted before ANY node,
+  // so circles always paint over a crossing line instead of the reverse, and (2) every
+  // label gets an opaque background chip (sized to its own text) so a line segment
+  // passing behind it is hidden rather than drawn through the letters.
+  const edgeParts = [];
+  const nodeParts = [];
+  const label = (x, y, text, opts = {}) => {
+    const fontSize = opts.sub ? 10.5 : 12;
+    const w = text.length * fontSize * 0.62 + 8;
+    const h = fontSize + 6;
+    nodeParts.push(`<rect x="${x - 4}" y="${y - fontSize + 1}" width="${w}" height="${h}" rx="2" fill="var(--bg)" />`);
+    nodeParts.push(
+      `<text class="${opts.sub ? 'topology-node-sub' : 'topology-node-label'}" x="${x}" y="${y}"${opts.bold ? ' font-weight="600"' : ''}>${escapeHtml(text)}</text>`
+    );
+  };
+
+  const haConfigured = ha && ha.configured !== false;
+  const hubTitle = haConfigured
+    ? `Central Office — ${ha.isActive ? 'Active' : 'Standby'} (${ha.role === 'primary' ? 'Primary' : 'Secondary'})`
+    : 'Central Office';
+  nodeParts.push(
+    `<circle class="topology-node hub" cx="${HUB_X}" cy="${hubY}" r="8"><title>${escapeHtml(hubTitle)}</title></circle>`
+  );
+  label(HUB_X + 14, hubY + 4, 'Central Office', { bold: true });
+
+  if (haConfigured) {
+    // A short dashed link straight above the hub node represents the standalone
+    // ha-agent pairing -- distinct from the solid site/port edges, since it's a
+    // control-plane health link, not a data tunnel. Color mirrors the same
+    // "consecutiveFailures === 0" healthy/unhealthy read used by the Account tab's
+    // High Availability panel, so the two views never disagree.
+    const peerY = hubY - 34;
+    const peerHealthy = ha.consecutiveFailures === 0;
+    const peerStatusClass = peerHealthy ? 'online' : 'warn';
+    const peerHealthText = peerHealthy
+      ? 'Healthy'
+      : `${ha.consecutiveFailures} consecutive check${ha.consecutiveFailures === 1 ? '' : 's'} failed`;
+    edgeParts.push(`<path class="topology-edge ha-link" d="M ${HUB_X} ${hubY} L ${HUB_X} ${peerY}" />`);
+    nodeParts.push(
+      `<circle class="topology-node ${peerStatusClass}" cx="${HUB_X}" cy="${peerY}" r="6"><title>Peer controller — ${escapeHtml(peerHealthText)}</title></circle>`
+    );
+    label(HUB_X + 14, peerY + 4, 'Peer Controller', { sub: true });
+    label(HUB_X + 14, hubY + 17, ha.isActive ? 'Active' : 'Standby', { sub: true });
+  }
+
+  for (const { site, siteY, portYs } of siteLayout) {
+    const statusClass = site.connected ? 'online' : 'offline';
+    edgeParts.push(edge(HUB_X, hubY, SITE_X, siteY));
+    nodeParts.push(
+      `<circle class="topology-node ${statusClass}" cx="${SITE_X}" cy="${siteY}" r="6"><title>${escapeHtml(site.name)} — ${site.connected ? 'Online' : 'Offline'}</title></circle>`
+    );
+    label(SITE_X + 12, siteY + 4, site.name);
+
+    if (site.ports.length === 0) {
+      label(SITE_X + 12, siteY + 17, 'no ports reported', { sub: true });
+      continue;
+    }
+    site.ports.forEach((port, i) => {
+      const py = portYs[i];
+      // A site being connected only means its tunnel is up -- it says nothing about
+      // whether the actual device behind a given port is plugged in. Use the port's own
+      // reported presence when the box sends one; only fall back to the site's
+      // connection state for older boxes that don't report it yet (present === undefined).
+      let portOnline;
+      let reachTitle;
+      if (!site.connected) {
+        portOnline = false;
+        reachTitle = 'Unreachable (site offline)';
+      } else if (port.present === false) {
+        portOnline = false;
+        reachTitle = 'Site online, but this device is not present';
+      } else if (port.present === true) {
+        portOnline = true;
+        reachTitle = 'Reachable (device present)';
+      } else {
+        portOnline = true;
+        reachTitle = 'Reachable (device presence unknown -- edge box does not report it yet)';
+      }
+      const portStatusClass = portOnline ? 'online' : 'offline';
+      const accessSuffix = port.access ? ` — ${accessLabel(port.access)}` : '';
+      edgeParts.push(edge(SITE_X, siteY, PORT_X, py));
+      nodeParts.push(
+        `<circle class="topology-node ${portStatusClass}" cx="${PORT_X}" cy="${py}" r="5"><title>${escapeHtml(port.label)} — ${reachTitle}${accessSuffix}</title></circle>`
+      );
+      label(PORT_X + 11, py + 4, port.label);
+    });
+  }
+
+  svg.innerHTML = edgeParts.join('') + nodeParts.join('');
+}
+
+// ---------- Row overflow menu (used by the Sites table) ----------
+function closeAllRowMenus() {
+  document.querySelectorAll('.row-menu-dropdown.open').forEach((el) => el.classList.remove('open'));
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.row-menu')) closeAllRowMenus();
+});
+
+/** items: array of {label, className, onClick} entries, or the string 'divider'. */
+function buildRowMenu(items) {
+  const wrap = document.createElement('div');
+  wrap.className = 'row-menu';
+  const btn = document.createElement('button');
+  btn.className = 'row-menu-btn secondary';
+  btn.textContent = '⋯';
+  btn.title = 'Actions';
+  const dropdown = document.createElement('div');
+  dropdown.className = 'row-menu-dropdown';
+  for (const item of items) {
+    if (item === 'divider') {
+      const divider = document.createElement('div');
+      divider.className = 'row-menu-divider';
+      dropdown.appendChild(divider);
+      continue;
+    }
+    const itemBtn = document.createElement('button');
+    itemBtn.textContent = item.label;
+    if (item.className) itemBtn.className = item.className;
+    itemBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('open');
+      await item.onClick();
+    });
+    dropdown.appendChild(itemBtn);
+  }
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const wasOpen = dropdown.classList.contains('open');
+    closeAllRowMenus();
+    if (!wasOpen) {
+      const rect = btn.getBoundingClientRect();
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      dropdown.style.right = `${window.innerWidth - rect.right}px`;
+      dropdown.classList.add('open');
+    }
+  });
+  wrap.appendChild(btn);
+  wrap.appendChild(dropdown);
+  return wrap;
+}
+
 async function loadSites() {
   const sites = await api.get('/api/sites');
+  renderTopology(sites);
   const tbody = document.querySelector('#sitesTable tbody');
   tbody.innerHTML = '';
   document.getElementById('sitesSelectAll').checked = false;
   for (const site of sites) {
     const tr = document.createElement('tr');
     const portsList = site.ports.length
-      ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code class="port-id">${escapeHtml(p.id)}</code></div>`).join('')
+      ? site.ports
+          .map((p) => {
+            const dotClass = p.present === true ? 'online' : p.present === false ? 'offline' : 'unknown';
+            const title = p.present === true ? 'Device present' : p.present === false ? 'Device not present' : 'Presence unknown';
+            return `<div><span class="topology-dot ${dotClass}" title="${title}"></span>${escapeHtml(p.label)} ${accessPill(p.access)}<code class="port-id">${escapeHtml(p.id)}</code></div>`;
+          })
+          .join('')
       : '<span class="hint">none reported yet</span>';
     const lastSeen = site.lastSeenAt ? new Date(site.lastSeenAt).toLocaleString() : '<span class="hint">never</span>';
     const backupInfo = site.lastBackup
@@ -269,56 +493,65 @@ async function loadSites() {
       <td></td>
     `;
     const actionsCell = tr.lastElementChild;
-    const queueBtn = document.createElement('button');
-    queueBtn.textContent = 'Upgrade Version';
-    queueBtn.addEventListener('click', async () => {
-      await api.post(`/api/sites/${site.id}/queue-update`);
-      alert(`An upgrade was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
-    });
-    const requestBackupBtn = document.createElement('button');
-    requestBackupBtn.textContent = 'Request Backup';
-    requestBackupBtn.style.marginLeft = '6px';
-    requestBackupBtn.addEventListener('click', async () => {
-      await api.post(`/api/sites/${site.id}/backup/request`);
-      alert(`A config backup was requested from "${site.name}" -- it's sent on the box's next heartbeat.`);
-    });
-    const syncAdminsBtn = document.createElement('button');
-    syncAdminsBtn.textContent = 'Sync Admins';
-    syncAdminsBtn.className = 'danger';
-    syncAdminsBtn.style.marginLeft = '6px';
-    syncAdminsBtn.addEventListener('click', async () => {
-      if (!confirm(`Replace every local admin account on "${site.name}" with this hub's own admin accounts? Any admin login not from the hub will stop working on that box. Applies on its next heartbeat.`)) return;
-      await api.post(`/api/sites/${site.id}/sync-admins`);
-      alert(`An admin sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
-    });
-    actionsCell.appendChild(queueBtn);
-    actionsCell.appendChild(requestBackupBtn);
-    actionsCell.appendChild(syncAdminsBtn);
-    if (site.lastBackup) {
-      const downloadBackupBtn = document.createElement('button');
-      downloadBackupBtn.textContent = 'Download Backup';
-      downloadBackupBtn.style.marginLeft = '6px';
-      downloadBackupBtn.addEventListener('click', () => {
-        window.location.href = `/api/sites/${site.id}/backup`;
+    const menuItems = [
+      {
+        label: 'Upgrade Version',
+        onClick: async () => {
+          await api.post(`/api/sites/${site.id}/queue-update`);
+          alert(`An upgrade was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
+        }
+      },
+      {
+        label: 'Request Backup',
+        onClick: async () => {
+          await api.post(`/api/sites/${site.id}/backup/request`);
+          alert(`A config backup was requested from "${site.name}" -- it's sent on the box's next heartbeat.`);
+        }
+      }
+    ];
+    if (site.connected) {
+      menuItems.push({
+        label: 'Open Admin UI',
+        onClick: async () => {
+          try {
+            const { port } = await api.post(`/api/sites/${site.id}/admin-session`);
+            window.open(`https://${window.location.hostname}:${port}/`, '_blank', 'noopener');
+          } catch (err) {
+            alert(err.message);
+          }
+        }
       });
-      actionsCell.appendChild(downloadBackupBtn);
     }
-    const restoreBtn = document.createElement('button');
-    restoreBtn.textContent = 'Restore Backup';
-    restoreBtn.style.marginLeft = '6px';
-    restoreBtn.addEventListener('click', () => openSiteRestoreModal(site));
-    actionsCell.appendChild(restoreBtn);
-    const delBtn = document.createElement('button');
-    delBtn.textContent = 'Delete';
-    delBtn.className = 'danger';
-    delBtn.style.marginLeft = '6px';
-    delBtn.addEventListener('click', async () => {
-      if (confirm(`Remove site "${site.name}"? This does not affect the edge box itself.`)) {
-        await api.del(`/api/sites/${site.id}`);
-        await loadSites();
+    if (site.lastBackup) {
+      menuItems.push({
+        label: 'Download Backup',
+        onClick: () => {
+          window.location.href = `/api/sites/${site.id}/backup`;
+        }
+      });
+    }
+    menuItems.push({ label: 'Restore Backup', onClick: () => openSiteRestoreModal(site) });
+    menuItems.push('divider');
+    menuItems.push({
+      label: 'Sync Admins',
+      className: 'danger',
+      onClick: async () => {
+        if (!confirm(`Replace every local admin account on "${site.name}" with this hub's own admin accounts? Any admin login not from the hub will stop working on that box. Applies on its next heartbeat.`)) return;
+        await api.post(`/api/sites/${site.id}/sync-admins`);
+        alert(`An admin sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
       }
     });
-    actionsCell.appendChild(delBtn);
+    menuItems.push({
+      label: 'Delete Site',
+      className: 'danger',
+      onClick: async () => {
+        if (confirm(`Remove site "${site.name}"? This does not affect the edge box itself.`)) {
+          await api.del(`/api/sites/${site.id}`);
+          await loadSites();
+        }
+      }
+    });
+    actionsCell.appendChild(buildRowMenu(menuItems));
     tbody.appendChild(tr);
   }
 }
@@ -503,9 +736,13 @@ async function loadUsers() {
       .map((id) => allGroups.find((g) => g.id === id))
       .filter(Boolean)
       .map((g) => escapeHtml(g.name));
+    const capturePill = user.captureEnabled
+      ? '<span class="pill ok"><span class="dot"></span>On</span>'
+      : '<span class="pill mute"><span class="dot"></span>Off</span>';
     tr.innerHTML = `
       <td>${escapeHtml(user.username)}</td>
       <td>${groupNames.length ? groupNames.join(', ') : '<span class="hint">none</span>'}</td>
+      <td>${capturePill}</td>
       <td></td>
     `;
     const actionsCell = tr.lastElementChild;
@@ -535,6 +772,7 @@ function openUserModal(user) {
   document.getElementById('userPassword').value = '';
   document.getElementById('userPasswordHint').textContent = user ? '(leave blank to keep the current password)' : '';
   document.getElementById('userPassword').required = !user;
+  document.getElementById('userCaptureEnabled').checked = !!(user && user.captureEnabled);
   clearFieldError('userUsername');
   clearFieldError('userPassword');
 
@@ -565,16 +803,17 @@ document.getElementById('saveUserBtn').addEventListener('click', async () => {
   const username = document.getElementById('userUsername').value.trim();
   const password = document.getElementById('userPassword').value;
   const groupIds = Array.from(document.querySelectorAll('#userGroupChecks input:checked')).map((c) => c.value);
+  const captureEnabled = document.getElementById('userCaptureEnabled').checked;
   let valid = true;
   if (!username) { setFieldError('userUsername', 'A username is required.'); valid = false; }
   if (!id && !password) { setFieldError('userPassword', 'A password is required.'); valid = false; }
   if (!valid) return;
   try {
     if (id) {
-      await api.post(`/api/users/${id}`, { username, groupIds });
+      await api.post(`/api/users/${id}`, { username, groupIds, captureEnabled });
       if (password) await api.post(`/api/users/${id}/password`, { password });
     } else {
-      await api.post('/api/users', { username, password, groupIds });
+      await api.post('/api/users', { username, password, groupIds, captureEnabled });
     }
     document.getElementById('userModalBackdrop').classList.remove('open');
     await loadUsers();
@@ -601,12 +840,30 @@ async function loadGroups() {
       const port = site && site.ports.find((p) => p.id === grant.portId);
       const item = document.createElement('div');
       item.className = 'grant-item';
-      item.innerHTML = `<span>${escapeHtml(site ? site.name : grant.siteId)} — ${escapeHtml(port ? port.label : grant.portId)}</span> <a href="#" class="remove">remove</a>`;
-      item.querySelector('.remove').addEventListener('click', async (e) => {
+      item.innerHTML = `<span>${escapeHtml(site ? site.name : grant.siteId)} — ${escapeHtml(port ? port.label : grant.portId)}</span>`;
+      const permSelect = document.createElement('select');
+      permSelect.className = 'grant-permission-select';
+      permSelect.innerHTML = '<option value="read-write">Read/write</option><option value="read-only">Read-only</option>';
+      permSelect.value = grant.permission === 'read-only' ? 'read-only' : 'read-write';
+      permSelect.addEventListener('change', async () => {
+        try {
+          await api.post(`/api/groups/${group.id}/grants/${grant.siteId}/${grant.portId}/permission`, { permission: permSelect.value });
+        } catch (err) {
+          alert(err.message);
+          await loadGroups();
+        }
+      });
+      item.appendChild(permSelect);
+      const removeLink = document.createElement('a');
+      removeLink.href = '#';
+      removeLink.className = 'remove';
+      removeLink.textContent = 'remove';
+      removeLink.addEventListener('click', async (e) => {
         e.preventDefault();
         await api.del(`/api/groups/${group.id}/grants/${grant.siteId}/${grant.portId}`);
         await loadGroups();
       });
+      item.appendChild(removeLink);
       grantsEl.appendChild(item);
     }
     tr.innerHTML = `<td>${escapeHtml(group.name)}</td><td></td><td></td>`;
@@ -684,21 +941,35 @@ function openGrantModal(group, sites) {
     }
     const portChecks = [];
     for (const port of site.ports) {
+      const row = document.createElement('div');
+      row.className = 'grant-port-row';
       const portLabel = document.createElement('label');
       const portCheck = document.createElement('input');
       portCheck.type = 'checkbox';
       portCheck.className = 'grant-port-check';
       portCheck.dataset.site = site.id;
       portCheck.dataset.port = port.id;
-      if (isGranted(site.id, port.id)) {
+      const alreadyGranted = isGranted(site.id, port.id);
+      if (alreadyGranted) {
         portCheck.checked = true;
         portCheck.disabled = true;
-        portLabel.title = 'Already granted';
+        portLabel.title = 'Already granted -- change its permission from the Groups tab grant list';
       }
       portChecks.push(portCheck);
       portLabel.appendChild(portCheck);
-      portLabel.appendChild(document.createTextNode(`${port.label}${portCheck.disabled ? ' (already granted)' : ''}`));
-      portsEl.appendChild(portLabel);
+      portLabel.appendChild(
+        document.createTextNode(`${port.label}${port.access ? ` (${accessLabel(port.access)})` : ''}${alreadyGranted ? ' (already granted)' : ''}`)
+      );
+      row.appendChild(portLabel);
+      if (!alreadyGranted) {
+        const permSelect = document.createElement('select');
+        permSelect.className = 'grant-port-permission';
+        permSelect.dataset.site = site.id;
+        permSelect.dataset.port = port.id;
+        permSelect.innerHTML = '<option value="read-write">Read/write</option><option value="read-only">Read-only</option>';
+        row.appendChild(permSelect);
+      }
+      portsEl.appendChild(row);
     }
     block.appendChild(portsEl);
     tree.appendChild(block);
@@ -726,10 +997,14 @@ document.getElementById('cancelGrantBtn').addEventListener('click', () => {
 });
 document.getElementById('saveGrantBtn').addEventListener('click', async () => {
   const groupId = document.getElementById('grantGroupId').value;
-  const grants = Array.from(document.querySelectorAll('#grantSiteTree .grant-port-check:checked:not(:disabled)')).map((cb) => ({
-    siteId: cb.dataset.site,
-    portId: cb.dataset.port
-  }));
+  const grants = Array.from(document.querySelectorAll('#grantSiteTree .grant-port-check:checked:not(:disabled)')).map((cb) => {
+    const permSelect = document.querySelector(`.grant-port-permission[data-site="${cb.dataset.site}"][data-port="${cb.dataset.port}"]`);
+    return {
+      siteId: cb.dataset.site,
+      portId: cb.dataset.port,
+      permission: permSelect ? permSelect.value : 'read-write'
+    };
+  });
   if (grants.length === 0) {
     document.getElementById('grantError').textContent = 'Check at least one port (or a site) first.';
     return;
@@ -760,6 +1035,7 @@ function renderSessions(sessions) {
       <td>${methodPill(s.method)}</td>
       <td>${s.portLabel ? escapeHtml(s.portLabel) : '<span class="hint">at menu</span>'}</td>
       <td>${since}</td>
+      <td>${formatBytes(s.rxBytes || 0)} / ${formatBytes(s.txBytes || 0)}</td>
       <td></td>
     `;
     const actionsCell = tr.lastElementChild;
@@ -805,6 +1081,162 @@ async function loadHostKeyFingerprint() {
   const { fingerprint } = await api.get('/api/host-key-fingerprint');
   document.getElementById('hostKeyFingerprint').textContent = fingerprint;
 }
+
+// ---------- High availability ----------
+const HA_DEFAULTS = {
+  enabled: false,
+  mode: 'vip',
+  role: 'primary',
+  peerHost: '',
+  listenPort: 8555,
+  peerPort: 8555,
+  vip: { address: '', prefix: 24, interface: 'eth0' },
+  dns: { updateCommand: '' },
+  healthCheck: { intervalMs: 3000, failureThreshold: 3, timeoutMs: 2000 },
+  replication: { intervalMs: 5000, remoteDataDir: '/opt/central-office/data', sshUser: 'central-office', sshKeyPath: '/opt/central-office/ha-agent/replication-key' },
+  preemptOnRecovery: false
+};
+
+function applyHaModeVisibility() {
+  const mode = document.getElementById('haModeSelect').value;
+  document.getElementById('haVipFields').hidden = mode !== 'vip';
+  document.getElementById('haDnsFields').hidden = mode !== 'dns';
+}
+
+function fillHaConfigForm(cfg) {
+  document.getElementById('haEnabled').checked = !!cfg.enabled;
+  document.getElementById('haRoleSelect').value = cfg.role || 'primary';
+  document.getElementById('haModeSelect').value = cfg.mode || 'vip';
+  document.getElementById('haPeerHost').value = cfg.peerHost || '';
+  document.getElementById('haListenPort').value = cfg.listenPort || 8555;
+  document.getElementById('haPeerPort').value = cfg.peerPort || 8555;
+  const vip = cfg.vip || {};
+  document.getElementById('haVipAddress').value = vip.address || '';
+  document.getElementById('haVipPrefix').value = vip.prefix != null ? vip.prefix : 24;
+  document.getElementById('haVipInterface').value = vip.interface || 'eth0';
+  document.getElementById('haDnsCommand').value = (cfg.dns && cfg.dns.updateCommand) || '';
+  const hc = cfg.healthCheck || {};
+  document.getElementById('haHcInterval').value = hc.intervalMs || 3000;
+  document.getElementById('haHcThreshold').value = hc.failureThreshold || 3;
+  document.getElementById('haHcTimeout').value = hc.timeoutMs || 2000;
+  const rep = cfg.replication || {};
+  document.getElementById('haRepInterval').value = rep.intervalMs || 5000;
+  document.getElementById('haRepRemoteDir').value = rep.remoteDataDir || '';
+  document.getElementById('haRepSshUser').value = rep.sshUser || '';
+  document.getElementById('haRepSshKey').value = rep.sshKeyPath || '';
+  document.getElementById('haPreempt').checked = !!cfg.preemptOnRecovery;
+  applyHaModeVisibility();
+}
+
+function readHaConfigForm() {
+  return {
+    enabled: document.getElementById('haEnabled').checked,
+    role: document.getElementById('haRoleSelect').value,
+    mode: document.getElementById('haModeSelect').value,
+    peerHost: document.getElementById('haPeerHost').value.trim(),
+    listenPort: Number(document.getElementById('haListenPort').value),
+    peerPort: Number(document.getElementById('haPeerPort').value),
+    vip: {
+      address: document.getElementById('haVipAddress').value.trim(),
+      prefix: Number(document.getElementById('haVipPrefix').value),
+      interface: document.getElementById('haVipInterface').value.trim()
+    },
+    dns: { updateCommand: document.getElementById('haDnsCommand').value.trim() },
+    healthCheck: {
+      intervalMs: Number(document.getElementById('haHcInterval').value),
+      failureThreshold: Number(document.getElementById('haHcThreshold').value),
+      timeoutMs: Number(document.getElementById('haHcTimeout').value)
+    },
+    replication: {
+      intervalMs: Number(document.getElementById('haRepInterval').value),
+      remoteDataDir: document.getElementById('haRepRemoteDir').value.trim(),
+      sshUser: document.getElementById('haRepSshUser').value.trim(),
+      sshKeyPath: document.getElementById('haRepSshKey').value.trim()
+    },
+    preemptOnRecovery: document.getElementById('haPreempt').checked
+  };
+}
+
+async function loadHaConfig() {
+  const cfg = await api.get('/api/ha/config');
+  fillHaConfigForm(cfg.configured === false ? HA_DEFAULTS : cfg);
+}
+
+document.getElementById('haModeSelect').addEventListener('change', applyHaModeVisibility);
+
+document.getElementById('haReloadConfigBtn').addEventListener('click', () => {
+  const msg = document.getElementById('haConfigMsg');
+  msg.textContent = '';
+  loadHaConfig().catch((err) => {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  });
+});
+
+document.getElementById('haSaveConfigBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('haConfigMsg');
+  msg.textContent = '';
+  try {
+    const result = await api.post('/api/ha/config', readHaConfigForm());
+    msg.style.color = 'var(--ok)';
+    msg.textContent = result.agentNotified
+      ? 'Saved and applied live to the running ha-agent.'
+      : 'Saved. The ha-agent on this node is not reachable yet -- start its systemd service to apply this (see README).';
+    await loadHaStatus();
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+async function loadHaStatus() {
+  const status = await api.get('/api/ha/status');
+  renderTopology(lastTopologySites, status);
+  const section = document.getElementById('haStatusSection');
+  if (status.configured === false) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  document.getElementById('haRole').textContent = status.role === 'primary' ? 'Primary' : 'Secondary';
+  document.getElementById('haIsActive').innerHTML = status.isActive
+    ? '<span class="pill ok"><span class="dot"></span>Active</span>'
+    : '<span class="pill mute"><span class="dot"></span>Standby</span>';
+  document.getElementById('haMode').textContent = status.mode === 'vip' ? 'Virtual IP' : 'DNS update';
+  const peerHealthy = status.consecutiveFailures === 0;
+  document.getElementById('haPeerHealth').innerHTML = peerHealthy
+    ? '<span class="pill ok"><span class="dot"></span>Healthy</span>'
+    : `<span class="pill warn"><span class="dot"></span>${status.consecutiveFailures} consecutive check${status.consecutiveFailures === 1 ? '' : 's'} failed</span>`;
+  document.getElementById('haLastReplication').innerHTML = status.isActive
+    ? '<span class="hint">n/a -- this node is active, it does not pull</span>'
+    : status.lastReplicationAt
+      ? `${new Date(status.lastReplicationAt).toLocaleString()}${status.lastReplicationError ? ` <span class="pill warn">last attempt failed: ${escapeHtml(status.lastReplicationError)}</span>` : ''}`
+      : '<span class="hint">never</span>';
+  document.getElementById('haPromotedAt').textContent = status.promotedAt ? new Date(status.promotedAt).toLocaleString() : 'never';
+  // Reclaiming only makes sense from a node that's currently standby -- promoting an
+  // already-active node is a no-op the agent itself already guards, but hiding the
+  // button here avoids implying there's something to reclaim when there isn't.
+  document.getElementById('haPromoteBtn').hidden = status.isActive;
+}
+
+document.getElementById('haRefreshBtn').addEventListener('click', () => loadHaStatus().catch((err) => alert(err.message)));
+
+document.getElementById('haPromoteBtn').addEventListener('click', async () => {
+  if (!confirm('Reclaim the primary role on this node? This claims the virtual IP (or updates DNS) and starts the main service here -- only do this once you\'re sure the other node has actually stepped down, to avoid both nodes being active at once.')) {
+    return;
+  }
+  const msg = document.getElementById('haMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/ha/promote');
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Promotion requested.';
+    await loadHaStatus();
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
 
 // ---------- Two-factor auth (My Account) ----------
 function setTotpStatusUi(enabled) {
@@ -1042,6 +1474,46 @@ async function loadLogHistory() {
   logView.scrollTop = logView.scrollHeight;
 }
 
+// ---------- External syslog server ----------
+async function loadSyslogSettings() {
+  const syslog = await api.get('/api/syslog');
+  document.getElementById('syslogEnabled').checked = syslog.enabled;
+  document.getElementById('syslogHost').value = syslog.host;
+  document.getElementById('syslogPort').value = syslog.port;
+  document.getElementById('syslogFacility').value = String(syslog.facility);
+}
+
+document.getElementById('saveSyslogBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('syslogMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/syslog', {
+      enabled: document.getElementById('syslogEnabled').checked,
+      host: document.getElementById('syslogHost').value.trim(),
+      port: Number(document.getElementById('syslogPort').value) || 514,
+      facility: Number(document.getElementById('syslogFacility').value)
+    });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Saved.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('testSyslogBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('syslogMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/syslog/test');
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Test message sent.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
 let eventSource = null;
 function connectEvents() {
   if (eventSource) eventSource.close();
@@ -1053,21 +1525,607 @@ function connectEvents() {
   });
   eventSource.addEventListener('sessions', (e) => renderSessions(JSON.parse(e.data)));
   eventSource.addEventListener('sites', () => loadSites());
+  eventSource.addEventListener('stats', (e) => renderStats(JSON.parse(e.data)));
+  eventSource.addEventListener('tftp-status', (e) => setTftpStatus(JSON.parse(e.data).running));
 }
+
+// ---------- Formatting helpers ----------
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = -1;
+  do {
+    value /= 1024;
+    unit += 1;
+  } while (value >= 1024 && unit < units.length - 1);
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
+}
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (days || hours) parts.push(`${hours}h`);
+  parts.push(`${minutes}m`);
+  return parts.join(' ');
+}
+
+// ---------- Dashboard / system info ----------
+function setBar(fillEl, percent) {
+  const pct = Math.max(0, Math.min(100, percent || 0));
+  fillEl.style.width = `${pct}%`;
+  fillEl.classList.toggle('warn', pct >= 70 && pct < 90);
+  fillEl.classList.toggle('danger', pct >= 90);
+}
+
+function renderStats(stats) {
+  document.getElementById('statCpu').textContent = `${stats.cpuPercent.toFixed(1)}%`;
+  setBar(document.getElementById('statCpuBar'), stats.cpuPercent);
+
+  document.getElementById('statMem').textContent = `${stats.memory.percent.toFixed(1)}%`;
+  setBar(document.getElementById('statMemBar'), stats.memory.percent);
+  document.getElementById('statMemSub').textContent =
+    `${formatBytes(stats.memory.used)} / ${formatBytes(stats.memory.total)}`;
+
+  if (stats.disk) {
+    document.getElementById('statDisk').textContent = `${stats.disk.percent.toFixed(1)}%`;
+    setBar(document.getElementById('statDiskBar'), stats.disk.percent);
+    document.getElementById('statDiskSub').textContent =
+      `${formatBytes(stats.disk.used)} / ${formatBytes(stats.disk.total)}`;
+  }
+
+  document.getElementById('systemUptime').textContent = formatUptime(stats.uptimeSec);
+  document.getElementById('statClients').textContent = stats.clientsConnected;
+}
+
+async function loadSystemInfo() {
+  const info = await api.get('/api/system/info');
+  document.getElementById('systemHostname').value = info.hostname;
+  document.getElementById('infoHostname').textContent = info.hostname;
+  document.getElementById('infoOsRelease').textContent = info.osRelease || 'Unknown';
+  document.getElementById('infoKernel').textContent = info.kernel;
+  document.getElementById('infoArch').textContent = info.arch;
+  document.getElementById('infoCpu').textContent = `${info.cpuModel} (${info.cpuCores} core${info.cpuCores === 1 ? '' : 's'})`;
+  document.getElementById('infoMemory').textContent = formatBytes(info.totalMemory);
+  document.getElementById('infoDisk').textContent = info.disk
+    ? `${formatBytes(info.disk.used)} / ${formatBytes(info.disk.total)} used (${info.disk.mount})`
+    : 'Unknown';
+  document.getElementById('infoNode').textContent = info.nodeVersion;
+  document.getElementById('infoAppVersion').textContent = info.appVersion;
+}
+
+document.getElementById('refreshSystemInfoBtn').addEventListener('click', () => loadSystemInfo().catch((err) => alert(err.message)));
+
+document.getElementById('saveHostnameBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('systemControlMsg');
+  msg.textContent = '';
+  const hostname = document.getElementById('systemHostname').value.trim();
+  try {
+    const result = await api.post('/api/system/hostname', { hostname });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = `Hostname updated to "${result.hostname}".`;
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+// ---------- Network ----------
+function renderNetworkInterfaces(interfaces) {
+  const tbody = document.querySelector('#networkInterfacesTable tbody');
+  const empty = document.getElementById('networkInterfacesEmpty');
+  tbody.innerHTML = '';
+  empty.style.display = interfaces.length ? 'none' : '';
+  for (const iface of interfaces) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(iface.name)}</td>
+      <td>${escapeHtml(iface.type)}</td>
+      <td><span class="status-pill inline${iface.state === 'connected' ? ' running' : ''}"><span class="dot"></span>${escapeHtml(iface.state)}</span></td>
+      <td>${escapeHtml(iface.ip || '—')}</td>
+      <td>${escapeHtml(iface.connection || '—')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+let timezonesLoaded = false;
+async function loadTimezoneList() {
+  if (timezonesLoaded) return;
+  const zones = await api.get('/api/network/timezones');
+  const select = document.getElementById('timezoneInput');
+  const saveBtn = document.getElementById('saveTimezoneBtn');
+  if (zones.length === 0) {
+    select.innerHTML = '<option value="">Unavailable in this environment</option>';
+    select.disabled = true;
+    saveBtn.disabled = true;
+    saveBtn.title = 'Requires timedatectl (systemd), which this host does not have.';
+    return;
+  }
+  select.disabled = false;
+  saveBtn.disabled = false;
+  saveBtn.title = '';
+  select.innerHTML = zones.map((z) => `<option value="${escapeHtml(z)}">${escapeHtml(z)}</option>`).join('');
+  timezonesLoaded = true;
+}
+
+function setTimezoneUi(timezone) {
+  const select = document.getElementById('timezoneInput');
+  if (select.disabled) return;
+  if (timezone && ![...select.options].some((o) => o.value === timezone)) {
+    select.insertAdjacentHTML('afterbegin', `<option value="${escapeHtml(timezone)}">${escapeHtml(timezone)}</option>`);
+  }
+  select.value = timezone || '';
+}
+
+function setNtpSyncUi(synchronized) {
+  const pill = document.getElementById('ntpSyncPill');
+  const text = document.getElementById('ntpSyncText');
+  pill.classList.toggle('running', synchronized === true);
+  text.textContent = synchronized === true ? 'Synced' : synchronized === false ? 'Not synced' : 'Unknown';
+}
+
+function prefixToMask(prefix) {
+  const bits = '1'.repeat(prefix).padEnd(32, '0');
+  return [0, 8, 16, 24].map((i) => parseInt(bits.slice(i, i + 8), 2)).join('.');
+}
+
+function populateStaticIpDevices(interfaces) {
+  const select = document.getElementById('staticIpDevice');
+  const previous = select.value;
+  select.innerHTML = interfaces
+    .map((i) => `<option value="${escapeHtml(i.name)}">${escapeHtml(i.name)} (${escapeHtml(i.type)})</option>`)
+    .join('');
+  if (previous && [...select.options].some((o) => o.value === previous)) {
+    select.value = previous;
+  }
+}
+
+async function loadStaticIpConfig() {
+  const device = document.getElementById('staticIpDevice').value;
+  const msg = document.getElementById('staticIpMsg');
+  const pill = document.getElementById('staticIpModePill');
+  const text = document.getElementById('staticIpModeText');
+  msg.textContent = '';
+  if (!device) {
+    pill.classList.remove('running');
+    text.textContent = '—';
+    return;
+  }
+  try {
+    const config = await api.get(`/api/network/interfaces/${encodeURIComponent(device)}/ip-config`);
+    const isManual = config.method === 'manual';
+    pill.classList.toggle('running', isManual);
+    text.textContent = isManual ? 'Static' : 'DHCP';
+    document.getElementById('staticIpAddress').value = config.address || '';
+    document.getElementById('staticIpMask').value = config.prefix != null ? prefixToMask(config.prefix) : '';
+    document.getElementById('staticIpGateway').value = config.gateway || '';
+  } catch (err) {
+    pill.classList.remove('running');
+    text.textContent = '—';
+    document.getElementById('staticIpAddress').value = '';
+    document.getElementById('staticIpMask').value = '';
+    document.getElementById('staticIpGateway').value = '';
+    msg.textContent = err.message;
+  }
+}
+
+document.getElementById('staticIpDevice').addEventListener('change', () => loadStaticIpConfig());
+
+async function loadNetwork() {
+  const data = await api.get('/api/network');
+  renderNetworkInterfaces(data.interfaces);
+  document.getElementById('publicIpValue').textContent = data.publicIp || 'unavailable';
+  document.getElementById('ntpServer').value = data.ntp.server;
+  setNtpSyncUi(data.ntp.synchronized);
+  document.getElementById('dnsServers').value = data.dns.join(', ');
+  await loadTimezoneList();
+  setTimezoneUi(data.timezone);
+  populateStaticIpDevices(data.interfaces);
+  await loadStaticIpConfig();
+}
+
+document.getElementById('refreshNetworkBtn').addEventListener('click', () => loadNetwork());
+
+document.getElementById('saveStaticIpBtn').addEventListener('click', async () => {
+  const device = document.getElementById('staticIpDevice').value;
+  const msg = document.getElementById('staticIpMsg');
+  msg.textContent = '';
+  if (!device) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Choose an interface first.';
+    return;
+  }
+  const address = document.getElementById('staticIpAddress').value.trim();
+  const mask = document.getElementById('staticIpMask').value.trim();
+  const gateway = document.getElementById('staticIpGateway').value.trim();
+  if (
+    !confirm(
+      `Set a static IP on ${device}? If anything here is wrong, this interface -- possibly including this admin UI, if you're reaching it through here -- could become unreachable until someone fixes it via SSH or the hypervisor console.`
+    )
+  ) {
+    return;
+  }
+  try {
+    await api.post(`/api/network/interfaces/${encodeURIComponent(device)}/ip`, { address, mask, gateway });
+    await loadStaticIpConfig();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Saved.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('clearStaticIpBtn').addEventListener('click', async () => {
+  const device = document.getElementById('staticIpDevice').value;
+  const msg = document.getElementById('staticIpMsg');
+  msg.textContent = '';
+  if (!device) return;
+  if (!confirm(`Revert ${device} to DHCP?`)) return;
+  try {
+    await api.post(`/api/network/interfaces/${encodeURIComponent(device)}/ip/clear`);
+    await loadStaticIpConfig();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Reverted to DHCP.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('saveNtpBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const msgEl = document.getElementById('timeDnsMsg');
+  msgEl.textContent = '';
+  const server = document.getElementById('ntpServer').value.trim();
+  if (!server) {
+    msgEl.textContent = 'NTP server is required';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api.post('/api/network/ntp', { server });
+    await loadNetwork();
+  } catch (err) {
+    msgEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('saveTimezoneBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const msgEl = document.getElementById('timeDnsMsg');
+  msgEl.textContent = '';
+  const timezone = document.getElementById('timezoneInput').value.trim();
+  if (!timezone) {
+    msgEl.textContent = 'Timezone is required';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api.post('/api/network/timezone', { timezone });
+    await loadNetwork();
+  } catch (err) {
+    msgEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('saveDnsBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const msgEl = document.getElementById('timeDnsMsg');
+  msgEl.textContent = '';
+  btn.disabled = true;
+  try {
+    await api.post('/api/network/dns', { servers: document.getElementById('dnsServers').value });
+    await loadNetwork();
+  } catch (err) {
+    msgEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('clearDnsBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const msgEl = document.getElementById('timeDnsMsg');
+  msgEl.textContent = '';
+  btn.disabled = true;
+  try {
+    await api.post('/api/network/dns', { servers: '' });
+    await loadNetwork();
+  } catch (err) {
+    msgEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- TFTP ----------
+function setTftpStatus(running) {
+  const pill = document.getElementById('tftpStatusPill');
+  const text = document.getElementById('tftpStatusText');
+  const btn = document.getElementById('toggleTftpBtn');
+  pill.classList.toggle('running', running);
+  text.textContent = running ? 'Running' : 'Stopped';
+  btn.textContent = running ? 'Stop Server' : 'Start Server';
+}
+
+async function loadTftpSettings() {
+  const config = await api.get('/api/tftp-settings');
+  document.getElementById('tftpPort').value = config.port;
+  document.getElementById('tftpAllowUpload').checked = config.allowUpload;
+  document.getElementById('tftpAutoStart').checked = config.autoStart;
+  const status = await api.get('/api/tftp/status');
+  setTftpStatus(status.running);
+}
+
+document.getElementById('saveTftpSettingsBtn').addEventListener('click', async () => {
+  await api.post('/api/tftp-settings', {
+    port: Number(document.getElementById('tftpPort').value),
+    allowUpload: document.getElementById('tftpAllowUpload').checked,
+    autoStart: document.getElementById('tftpAutoStart').checked
+  });
+});
+
+document.getElementById('toggleTftpBtn').addEventListener('click', async () => {
+  const status = await api.get('/api/tftp/status');
+  try {
+    const result = status.running ? await api.post('/api/tftp/stop') : await api.post('/api/tftp/start');
+    setTftpStatus(result.running);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+async function loadTftpFiles() {
+  const files = await api.get('/api/tftp/files');
+  const tbody = document.querySelector('#tftpFilesTable tbody');
+  const empty = document.getElementById('tftpFilesEmpty');
+  tbody.innerHTML = '';
+  empty.style.display = files.length ? 'none' : 'block';
+  for (const f of files) {
+    const tr = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = `/api/tftp/files/${encodeURIComponent(f.name)}`;
+    link.textContent = f.name;
+    nameCell.appendChild(link);
+    tr.appendChild(nameCell);
+    const sizeCell = document.createElement('td');
+    sizeCell.textContent = formatBytes(f.size);
+    tr.appendChild(sizeCell);
+    const modCell = document.createElement('td');
+    modCell.textContent = new Date(f.modifiedAt).toLocaleString();
+    tr.appendChild(modCell);
+    const actionsCell = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'danger';
+    delBtn.addEventListener('click', async () => {
+      if (confirm(`Delete "${f.name}"?`)) {
+        await api.del(`/api/tftp/files/${encodeURIComponent(f.name)}`);
+        await loadTftpFiles();
+      }
+    });
+    actionsCell.appendChild(delBtn);
+    tr.appendChild(actionsCell);
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('tftpUploadBtn').addEventListener('click', () => {
+  document.getElementById('tftpUploadInput').click();
+});
+
+document.getElementById('tftpUploadInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const msg = document.getElementById('tftpUploadMsg');
+  msg.textContent = '';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/tftp/files', { method: 'POST', body: formData });
+    if (!res.ok) throw await apiError(res);
+    await loadTftpFiles();
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+// ---------- Session captures ----------
+async function loadCaptures() {
+  const captures = await api.get('/api/captures');
+  const tbody = document.querySelector('#capturesTable tbody');
+  const empty = document.getElementById('capturesEmpty');
+  tbody.innerHTML = '';
+  empty.style.display = captures.length ? 'none' : 'block';
+  for (const c of captures) {
+    const tr = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = `/api/captures/${encodeURIComponent(c.name)}`;
+    link.textContent = c.name;
+    nameCell.appendChild(link);
+    tr.appendChild(nameCell);
+    const sizeCell = document.createElement('td');
+    sizeCell.textContent = formatBytes(c.size);
+    tr.appendChild(sizeCell);
+    const modCell = document.createElement('td');
+    modCell.textContent = new Date(c.modifiedAt).toLocaleString();
+    tr.appendChild(modCell);
+    const actionsCell = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'danger';
+    delBtn.addEventListener('click', async () => {
+      if (confirm(`Delete capture "${c.name}"?`)) {
+        await api.del(`/api/captures/${encodeURIComponent(c.name)}`);
+        await loadCaptures();
+      }
+    });
+    actionsCell.appendChild(delBtn);
+    tr.appendChild(actionsCell);
+    tbody.appendChild(tr);
+  }
+}
+
+document.getElementById('refreshCapturesBtn').addEventListener('click', () => loadCaptures());
+
+// ---------- TLS certificate ----------
+async function loadTlsInfo() {
+  try {
+    const info = await api.get('/api/tls/info');
+    document.getElementById('tlsType').textContent = info.selfSigned ? 'Self-signed (auto-generated)' : 'Custom';
+    document.getElementById('tlsSubject').textContent = info.subject;
+    document.getElementById('tlsIssuer').textContent = info.issuer;
+    document.getElementById('tlsValidity').textContent =
+      `${new Date(info.validFrom).toLocaleDateString()} – ${new Date(info.validTo).toLocaleDateString()}` +
+      (info.expired ? ' (expired)' : '');
+    document.getElementById('tlsFingerprint').textContent = info.fingerprint;
+  } catch (err) {
+    document.getElementById('tlsMsg').textContent = err.message;
+  }
+}
+
+document.getElementById('uploadTlsCertBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('tlsMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = '';
+  const certFile = document.getElementById('tlsCertFile').files[0];
+  const keyFile = document.getElementById('tlsKeyFile').files[0];
+  if (!certFile || !keyFile) {
+    msg.textContent = 'Choose both a certificate file and a private key file.';
+    return;
+  }
+  const formData = new FormData();
+  formData.append('cert', certFile);
+  formData.append('key', keyFile);
+  try {
+    const res = await fetch('/api/tls/upload', { method: 'POST', body: formData });
+    if (!res.ok) throw await apiError(res);
+    document.getElementById('tlsCertFile').value = '';
+    document.getElementById('tlsKeyFile').value = '';
+    await loadTlsInfo();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Certificate uploaded. Restart the service for it to take effect.';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('revertTlsCertBtn').addEventListener('click', async () => {
+  if (!confirm('Discard the current certificate and generate a fresh self-signed one?')) return;
+  const msg = document.getElementById('tlsMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = '';
+  try {
+    await api.post('/api/tls/revert');
+    await loadTlsInfo();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Reverted to a self-signed certificate. Restart the service for it to take effect.';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('restartServiceBtn').addEventListener('click', async () => {
+  if (!confirm('Restart the service now? Active tunnels and web/SSH sessions will briefly disconnect.')) return;
+  const msg = document.getElementById('tlsMsg');
+  msg.style.color = 'var(--text-dim)';
+  msg.textContent = 'Restarting…';
+  try {
+    await api.post('/api/system/restart-service');
+    const backUp = await pollUntilBackUp(() => {
+      msg.textContent = 'Waiting for the service to come back...';
+    });
+    if (backUp) {
+      msg.style.color = 'var(--ok)';
+      msg.textContent = 'Back up. Reloading…';
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = 'Did not come back within 3 minutes — check on it directly.';
+    }
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+// ---------- Users: CSV import ----------
+document.getElementById('downloadUserTemplateBtn').addEventListener('click', () => {
+  const template =
+    'username,password,groups,capture\n' + 'alice,changeme123,NOC Team,yes\n' + 'bob,changeme456,"NOC Team;Lab Access",\n';
+  const blob = new Blob([template], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'users-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importUsersBtn').addEventListener('click', () => {
+  document.getElementById('importUsersInput').click();
+});
+
+document.getElementById('importUsersInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const msg = document.getElementById('importUsersMsg');
+  msg.textContent = '';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/users/import', { method: 'POST', body: formData });
+    if (!res.ok) throw await apiError(res);
+    const result = await res.json();
+    let summary = `Imported ${result.created.length} user${result.created.length === 1 ? '' : 's'}.`;
+    if (result.skipped.length) {
+      summary +=
+        `\n\nSkipped ${result.skipped.length}:\n` +
+        result.skipped.map((s) => `Row ${s.row} (${s.username}): ${s.reason}`).join('\n');
+    }
+    alert(summary);
+    await loadUsers();
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
 
 // ---------- Init ----------
 async function initApp() {
+  renderStats(await api.get('/api/stats'));
+  await loadSystemInfo();
   await loadSites();
   await loadTokens();
   await loadGroups();
   await loadUsers();
+  await loadNetwork();
+  await loadTftpSettings();
+  await loadTftpFiles();
   await loadMyUsername();
   await loadTotpStatus();
   await loadHostKeyFingerprint();
+  await loadHaConfig();
+  await loadHaStatus();
+  await loadTlsInfo();
   await loadVersion();
   await loadUpdateStatus();
   renderSessions(await api.get('/api/sessions'));
+  await loadCaptures();
   await loadLogHistory();
+  await loadSyslogSettings();
   connectEvents();
 }
 

@@ -95,7 +95,7 @@ function connectTerminal(siteId, portId, label) {
     if (typeof event.data === 'string') {
       const msg = JSON.parse(event.data);
       if (msg.type === 'connected') {
-        document.getElementById('terminalTitle').textContent = msg.label || label;
+        document.getElementById('terminalTitle').textContent = (msg.label || label) + (msg.readOnly ? ' (read-only)' : '');
       } else if (msg.type === 'error') {
         term.write(`\r\n\x1b[31m[${msg.message}]\x1b[0m\r\n`);
       }

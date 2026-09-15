@@ -1,0 +1,685 @@
+<title>Central Office Hub Handbook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #eef1ee;
+    --panel: #e3e8e2;
+    --panel-2: #dbe1da;
+    --ink: #1a231f;
+    --ink-dim: #4b5650;
+    --border: #c7d0c4;
+    --accent: #a8621f;
+    --accent-ink: #ffffff;
+    --ok: #3c7d5e;
+    --ok-bg: #dcece2;
+    --danger: #a13a2c;
+    --danger-bg: #f3e0da;
+    --code-bg: #dde3db;
+    --link: #8a5219;
+    --shadow: 0 1px 2px rgba(20, 30, 22, 0.06), 0 6px 20px rgba(20, 30, 22, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181a;
+      --panel: #1b2123;
+      --panel-2: #21282a;
+      --ink: #e7ece7;
+      --ink-dim: #9caba1;
+      --border: #333d38;
+      --accent: #d99a4e;
+      --accent-ink: #1a1206;
+      --ok: #6cbb93;
+      --ok-bg: #1c2f26;
+      --danger: #e08268;
+      --danger-bg: #33211c;
+      --code-bg: #232b28;
+      --link: #e2ab63;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181a;
+    --panel: #1b2123;
+    --panel-2: #21282a;
+    --ink: #e7ece7;
+    --ink-dim: #9caba1;
+    --border: #333d38;
+    --accent: #d99a4e;
+    --accent-ink: #1a1206;
+    --ok: #6cbb93;
+    --ok-bg: #1c2f26;
+    --danger: #e08268;
+    --danger-bg: #33211c;
+    --code-bg: #232b28;
+    --link: #e2ab63;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  a { color: var(--link); }
+  code, kbd, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.88em;
+  }
+  kbd {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.05em 0.5em;
+    font-size: 0.85em;
+    font-weight: 500;
+  }
+  h1, h2, h3 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    text-wrap: balance;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+
+  /* ---------- Header ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 30px 32px 26px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 3px var(--ok-bg);
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .title-row img {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+  }
+  h1.title {
+    font-size: clamp(26px, 3.6vw, 38px);
+    margin: 10px 0 8px;
+  }
+  .subtitle {
+    color: var(--ink-dim);
+    font-size: 16.5px;
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  .factstrip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 22px;
+    box-shadow: var(--shadow);
+  }
+  .fact {
+    background: var(--bg);
+    padding: 13px 16px;
+  }
+  .fact .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .fact .v {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14.5px;
+    font-weight: 500;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 48px;
+    padding: 40px 32px 100px;
+    align-items: start;
+  }
+  nav.toc {
+    position: sticky;
+    top: 24px;
+    font-size: 13.5px;
+  }
+  nav.toc .group-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 20px 0 8px;
+  }
+  nav.toc .group-label:first-child { margin-top: 0; }
+  nav.toc ul { list-style: none; margin: 0; padding: 0; }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    display: block;
+    padding: 5px 0 5px 12px;
+    border-left: 2px solid transparent;
+    color: var(--ink-dim);
+    text-decoration: none;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  nav.toc a:hover { color: var(--ink); border-color: var(--border); }
+
+  main { min-width: 0; }
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  section > h2 {
+    font-size: 23px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    margin: 0 0 18px;
+  }
+  section h3 {
+    font-size: 17px;
+    margin: 28px 0 10px;
+    scroll-margin-top: 20px;
+  }
+  .lede {
+    max-width: 68ch;
+  }
+  p, li { max-width: 68ch; }
+  ul, ol { padding-left: 1.3em; }
+  li + li { margin-top: 6px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 14px; }
+  .card h4 {
+    margin: 0 0 6px;
+    font-size: 14.5px;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .card p:last-child { margin-bottom: 0; }
+
+  .tab-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+  }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: var(--panel);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--panel); }
+  td code { white-space: nowrap; }
+
+  .callout {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    max-width: 68ch;
+  }
+  .callout .mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+  .callout.warn { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+  .callout.warn .mark { background: var(--danger); color: #fff; }
+  .callout.tip { background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
+  .callout.tip .mark { background: var(--ok); color: #fff; }
+  .callout p { margin: 0; max-width: none; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.mute { background: var(--panel-2); color: var(--ink-dim); }
+  .pill.warn { background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--accent); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; max-width: 68ch; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 38px;
+    margin-bottom: 16px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: -1px;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  pre.term {
+    background: #1c231f;
+    color: #d9e6dc;
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.65;
+    box-shadow: var(--shadow);
+  }
+  pre.term .c1 { color: #7fa88f; }
+  pre.term .c2 { color: #e2ab63; }
+
+  footer {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 32px 60px;
+    color: var(--ink-dim);
+    font-size: 13px;
+  }
+  footer .rule { border-top: 1px solid var(--border); margin-bottom: 20px; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: static; columns: 2; margin-bottom: 8px; }
+  }
+</style>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Fleet Management &middot; Central Office</div>
+    <div class="title-row">
+      <img src="webui/assets/logo.png" alt="Central Office Hub logo" />
+      <h1 class="title">Central Office Hub Handbook</h1>
+    </div>
+    <p class="subtitle">How to administer a fleet of Serial Killer Terminal Server appliances from one place &mdash; sites, users, permissions, sessions, and redundancy.</p>
+
+    <div class="factstrip">
+      <div class="fact"><span class="k">Web admin UI</span><span class="v">https://&lt;host&gt;:8443</span></div>
+      <div class="fact"><span class="k">Site tunnel port</span><span class="v">443 (recommended)</span></div>
+      <div class="fact"><span class="k">Default login</span><span class="v">admin / letmein0!</span></div>
+      <div class="fact"><span class="k">Reaches sites via</span><span class="v">outbound-only SSH tunnels</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="group-label">Start here</div>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#first-login">First login</a></li>
+      <li><a href="#accounts">Three account systems</a></li>
+    </ul>
+    <div class="group-label">Admin UI</div>
+    <ul>
+      <li><a href="#tab-dashboard">Dashboard</a></li>
+      <li><a href="#tab-sites">Sites</a></li>
+      <li><a href="#tab-users">Users</a></li>
+      <li><a href="#tab-groups">Groups</a></li>
+      <li><a href="#tab-network">Network</a></li>
+      <li><a href="#tab-tftp">TFTP</a></li>
+      <li><a href="#tab-sessions">Sessions &amp; Log</a></li>
+      <li><a href="#tab-account">Account</a></li>
+      <li><a href="#tab-about">About</a></li>
+    </ul>
+    <div class="group-label">Reference</div>
+    <ul>
+      <li><a href="#access-modes">Access modes &amp; permissions</a></li>
+      <li><a href="#high-availability">High availability</a></li>
+      <li><a href="#security">Security notes</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <section id="overview">
+      <h2>Overview</h2>
+      <p class="lede">Central Office Hub is a fleet-management console for many Serial Killer Terminal Server appliances ("sites") at once. Each enrolled site dials <em>out</em> to the hub over a signed SSH tunnel &mdash; nothing has to be opened inbound on a site's own firewall or NAT for the hub to reach it. Once enrolled, a site's ports, users, and admin state show up here automatically, and console access to any of its ports is granted and audited centrally instead of per-box.</p>
+      <p>Everything the hub does is optional from a site's point of view: a site not enrolled in any hub keeps working exactly the same, standalone. Enrolling doesn't change how the site's own local admin UI behaves, aside from the settings you explicitly choose (like disabling local SSH/web console once the hub takes over as the access path).</p>
+    </section>
+
+    <section id="first-login">
+      <h2>First login</h2>
+      <p>Visit <code>https://&lt;hub-host&gt;:8443</code> (accept the self-signed certificate warning on a fresh install) and sign in with <code>admin</code> / <code>letmein0!</code>. You'll be required to set a new password immediately, enforced by the server itself &mdash; there's no way to skip it.</p>
+      <div class="callout tip">
+        <span class="mark">Optional 2FA</span>
+        <p>Turn on two-factor authentication for this account any time from <a href="#tab-account">Account &rarr; Two-Factor Authentication</a>. Off by default.</p>
+      </div>
+    </section>
+
+    <section id="accounts">
+      <h2>Three account systems, not one</h2>
+      <div class="tab-grid">
+        <div class="card">
+          <h4>Hub admin accounts</h4>
+          <p>Full control over this hub &mdash; sites, users, groups, and hub settings. Managed in <a href="#tab-account">Account</a>. Unrelated to any site's own admin login.</p>
+        </div>
+        <div class="card">
+          <h4>Console users</h4>
+          <p>Reach serial ports on enrolled sites, through <a href="#tab-groups">group grants</a> only. Never see this admin UI. Managed in <a href="#tab-users">Users</a>.</p>
+        </div>
+        <div class="card">
+          <h4>Each site's own admin account</h4>
+          <p>Separate from both of the above &mdash; the same local <code>admin</code> login the site has always had, standalone or not. Optionally kept in sync with this hub's own admin accounts via <strong>Sync Admins</strong> on the <a href="#tab-sites">Sites</a> tab, but only when you explicitly trigger it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-dashboard">
+      <h2>Web Admin UI</h2>
+      <h3 id="tab-dashboard-inner">Dashboard</h3>
+      <div class="card">
+        <h4>System</h4>
+        <p>This hub's own resource usage &mdash; CPU, memory, disk, uptime &mdash; plus <strong>Connected Clients</strong>: everyone currently signed into a session through this hub (SSH and web console together), regardless of which site or port they're on.</p>
+      </div>
+      <div class="card">
+        <h4>Fleet Topology</h4>
+        <p>A live diagram: hub &rarr; each enrolled site &rarr; that site's reported ports. Node color reflects real reachability, not just enrollment &mdash; a site node is red if its tunnel is down, and a port node is red if the site is online but that specific device isn't plugged in (when the site's firmware reports port presence; older sites without that just show reachable-or-not by tunnel state alone). Hover any node for detail.</p>
+        <p>If this hub has <a href="#high-availability">High Availability</a> configured, a second node appears directly above the hub's own, linked by a dashed line: the paired controller. It shows whether <em>this</em> node is currently Active or Standby, and whether the health link to its peer is currently healthy.</p>
+      </div>
+      <div class="card">
+        <h4>System Information</h4>
+        <p>Hostname, OS, kernel, architecture, CPU, memory, disk, Node.js version, and this app's own version &mdash; a snapshot of the hub host itself, not any site.</p>
+      </div>
+    </section>
+
+    <section id="tab-sites">
+      <h3 id="tab-sites-inner">Sites</h3>
+      <div class="card">
+        <p>Each row is one enrolled edge box, identified by its tunnel public key. Its ports are reported automatically by heartbeat (every 30 seconds while it's online) &mdash; nothing to enter by hand. <strong>Reveal Port IDs</strong> shows the raw internal ID behind each port label, occasionally useful when cross-referencing a URL or API call.</p>
+      </div>
+      <div class="card">
+        <h4>Adding a site</h4>
+        <p>Two ways to enroll: paste the site's own tunnel public key directly (shown on its Central Office panel), or generate a token here under <strong>Enrollment Tokens</strong> and paste that into the site instead &mdash; it fills in the hub's own address and registers the key in one step, without copying anything by hand.</p>
+      </div>
+      <div class="card">
+        <h4>Per-site actions</h4>
+        <p>The <strong>&#8942;</strong> menu on each row keeps the table uncluttered:</p>
+        <ul>
+          <li><strong>Upgrade Version</strong> / <strong>Request Backup</strong> &mdash; queued, applied on the site's next heartbeat, not instantly.</li>
+          <li><strong>Open Admin UI</strong> &mdash; opens that site's own HTTPS admin UI in a new tab, tunneled through the same encrypted connection as its console traffic. Only shown while the site is connected. The tunnel itself never terminates or inspects the TLS inside it &mdash; it's a raw byte pipe straight to the site's own web server.</li>
+          <li><strong>Download Backup</strong> / <strong>Restore Backup</strong> &mdash; work with whatever config backup that site last sent (or push one from a local file).</li>
+          <li><strong>Sync Admins</strong> &mdash; replaces <em>every</em> local admin account on that site with this hub's own admin account list. Confirms before running, since it's a hard replace, not a merge.</li>
+          <li><strong>Delete Site</strong> &mdash; removes it from the hub's list only. Doesn't touch the edge box itself, which can re-enroll later.</li>
+        </ul>
+        <p>The Status column shows <strong>Admins in sync</strong> or not, computed by comparing a cryptographic fingerprint of both sides' actual admin credentials (not just usernames) &mdash; so it only ever shows green when the accounts really do match.</p>
+      </div>
+      <div class="card">
+        <h4>Bulk actions</h4>
+        <p>Select multiple sites with the row checkboxes to <strong>Upgrade Version for Selected</strong> or <strong>Sync Admins for Selected</strong> in one go, instead of one at a time.</p>
+      </div>
+    </section>
+
+    <section id="tab-users">
+      <h3 id="tab-users-inner">Users</h3>
+      <div class="card">
+        <p>Console users reach ports through <a href="#tab-groups">group grants</a> only &mdash; they never see this admin UI. Each row shows which groups a user belongs to and whether their sessions are captured.</p>
+        <ul>
+          <li><strong>Groups</strong> &mdash; a user's effective access is the union of every group they're in. If two groups disagree on permission for the same port, the more permissive one wins (see <a href="#access-modes">Access modes &amp; permissions</a>).</li>
+          <li><strong>Capture</strong> &mdash; when on, every session this user starts is recorded to a file, regardless of which port or site it's on. Independent of any per-port capture setting a site itself might have.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Import from CSV</h4>
+        <p><strong>Import from CSV&hellip;</strong> bulk-creates console user accounts. <strong>Download CSV Template</strong> gives you a starting file with the right headers.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>username</code></td><td>Required.</td></tr>
+              <tr><td><code>password</code></td><td>Required.</td></tr>
+              <tr><td><code>groups</code></td><td>Semicolon- or comma-separated list of existing group names. Unrecognized names are ignored, noted in the import summary.</td></tr>
+              <tr><td><code>capture</code></td><td><code>yes</code> / <code>true</code> / <code>1</code> to always capture this user's sessions. Defaults to off.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Only ever <em>creates</em> accounts &mdash; a username that already exists is skipped, not overwritten.</p>
+      </div>
+    </section>
+
+    <section id="tab-groups">
+      <h3 id="tab-groups-inner">Groups</h3>
+      <div class="card">
+        <p>A group grants access to specific ports on specific sites &mdash; access is configured per group, never assigned to a user directly. Add a user to a group to give them everything that group grants.</p>
+        <p>Each grant carries its own <strong>read-write</strong> or <strong>read-only</strong> permission, settable right in the group's grant list, down to the individual port &mdash; not just the whole site. See <a href="#access-modes">Access modes &amp; permissions</a> for exactly what read-only restricts.</p>
+      </div>
+      <div class="callout tip">
+        <span class="mark">Most permissive wins</span>
+        <p>A user in two groups that both grant the same port, one read-only and one read-write, gets read-write &mdash; the effective permission for any port is the most permissive value across every group that user belongs to.</p>
+      </div>
+    </section>
+
+    <section id="tab-network">
+      <h3 id="tab-network-inner">Network</h3>
+      <div class="card">
+        <p><strong>Interfaces</strong> lists every network interface this hub host has, its state, and IP address, plus its <strong>Public IP</strong> as seen from the internet. <strong>Static IP</strong> and <strong>Time &amp; DNS</strong> configure the host directly through NetworkManager/systemd &mdash; the same mechanism the appliance itself uses, so the same caution applies: a wrong address or gateway here can cut off the admin UI if you're reaching it through the interface you just changed.</p>
+      </div>
+      <div class="card">
+        <h4>System Control</h4>
+        <p>Sets this hub host's own hostname.</p>
+      </div>
+    </section>
+
+    <section id="tab-tftp">
+      <h3 id="tab-tftp-inner">TFTP</h3>
+      <div class="card">
+        <p>Off by default. Useful for pushing firmware or config files to network devices reachable from the hub host itself &mdash; separate from any TFTP server a site might run on its own network. The standard port (69) needs no extra privileges here; the service is granted that capability directly, the same way the appliance is.</p>
+      </div>
+    </section>
+
+    <section id="tab-sessions">
+      <h3 id="tab-sessions-inner">Sessions &amp; Log</h3>
+      <div class="tab-grid">
+        <div class="card">
+          <h4>Active Sessions</h4>
+          <p>Every SSH and web console session currently open through this hub, across every site, with live <strong>Traffic (RX / TX)</strong> byte counters and how long each has been connected. <strong>Disconnect</strong> ends one immediately.</p>
+        </div>
+        <div class="card">
+          <h4>Log</h4>
+          <p>A live stream of connect/disconnect events and hub activity. Admin actions are tagged <code>[AUDIT]</code> right in this same stream.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Session Captures</h4>
+        <p>Byte-for-byte logs of past sessions for users with <strong>Capture</strong> turned on (Users tab) &mdash; one file per session, listed with size and last-modified time. Click a filename to download it; <strong>Delete</strong> removes it permanently.</p>
+      </div>
+      <div class="card">
+        <h4>External Syslog Server</h4>
+        <p>Mirrors every <code>[AUDIT]</code> entry to an external syslog server in real time, over UDP using the standard BSD (RFC&nbsp;3164) format. Off by default. Fill in the server's host and port (<code>514</code> is the usual default) and a facility, then <strong>Save Settings</strong>; <strong>Send Test Message</strong> confirms it's reaching the collector without waiting for a real event. Packets from this hub are tagged <code>central-office:</code>, distinct from the <code>terminalserver:</code> tag a site's own syslog forwarding uses &mdash; so a shared collector can tell the two apart.</p>
+      </div>
+    </section>
+
+    <section id="tab-account">
+      <h3 id="tab-account-inner">Account</h3>
+      <div class="tab-grid">
+        <div class="card">
+          <h4>My Account</h4>
+          <p>Change your own hub admin password, and turn on <strong>Two-Factor Authentication</strong> (scan a QR code into an authenticator app, confirm a code, done &mdash; same flow as the appliance's admin 2FA).</p>
+        </div>
+        <div class="card">
+          <h4>Password Policy</h4>
+          <p>Applies to hub admin accounts only. Sites authenticate to the hub by key, not password, so this doesn't touch them.</p>
+        </div>
+        <div class="card">
+          <h4>Hub SSH Host Key</h4>
+          <p>The fingerprint a site should pin in its own Central Office panel, so its tunnel connection verifies it's really talking to this hub before trusting it.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h4 id="high-availability-inner">High Availability</h4>
+        <p>Configures and shows the status of the standalone <code>ha-agent</code> process on <em>this</em> node &mdash; see <a href="#high-availability">High availability</a> below for the full picture. In short: fill in this node's role, peer, and failover mode here and click <strong>Save Configuration</strong>; it writes the agent's config and applies most changes live, no restart needed.</p>
+      </div>
+      <div class="card">
+        <h4>TLS Certificate</h4>
+        <p>Covers this admin UI's own HTTPS certificate. A self-signed one is generated automatically on first boot; upload your own to replace it.</p>
+      </div>
+      <div class="card">
+        <h4>Backup &amp; Restore</h4>
+        <p>Saves or replaces this hub's <em>entire</em> configuration &mdash; sites, users, groups, grants, admin accounts &mdash; as a single JSON file. This is the hub's own fleet configuration, separate from any individual site's backup (handled per-site from the <a href="#tab-sites">Sites</a> tab).</p>
+      </div>
+    </section>
+
+    <section id="tab-about">
+      <h3>About</h3>
+      <div class="card">
+        <p>Hub version, project links, and <strong>Version &amp; Updates</strong> &mdash; checks GitHub for a newer release and applies an in-place update, with one level of rollback available from the same panel.</p>
+      </div>
+    </section>
+
+    <section id="access-modes">
+      <h2>Access modes &amp; permissions</h2>
+      <p>Every port a site reports carries an <strong>access mode</strong>, set on the site itself and shown read-only here (in the Sites table's port list, in topology tooltips, and in the Grant dialog): <strong>Exclusive</strong> (one session at a time), <strong>Shared (read/write)</strong>, <strong>Shared (first user read/write)</strong>, or <strong>Shared (read-only)</strong>. These describe how the port itself behaves when multiple sessions land on it &mdash; they come from the site, not from the hub.</p>
+      <p>Layered on top of that, independently, is the hub's own <strong>read-write / read-only</strong> permission per grant (see <a href="#tab-groups">Groups</a>). A read-only grant still lets a user open a session and watch the port's output, but their own keystrokes are never forwarded to the device &mdash; they'll see <em>"This session is read-only; your input will not be sent to the port"</em> right in the session, and the one exception is the detach key (<kbd>Ctrl</kbd>+<kbd>]</kbd>), which always works so a read-only session can still be left cleanly.</p>
+    </section>
+
+    <section id="high-availability">
+      <h2>High availability</h2>
+      <p class="lede">Optional automatic failover across two hub VMs, so the hub itself isn't a single point of failure for the whole fleet. A standalone <code>ha-agent</code> process runs on both nodes at all times, independent of the main hub app: it health-checks its peer, and if the peer goes unreachable past a threshold, promotes itself &mdash; final data pull, claim the shared address (or update DNS), start the hub service.</p>
+      <div class="card">
+        <h4>Configuring it</h4>
+        <p>Everything is set from <strong>Account &rarr; High Availability</strong> on each node &mdash; no file to hand-edit. Fill in:</p>
+        <ul>
+          <li><strong>Role</strong> &mdash; Primary on one VM, Secondary on the other.</li>
+          <li><strong>Failover mode</strong> &mdash; <strong>Virtual IP</strong> (a floating address that moves between nodes on the same network segment, fails over in seconds) or <strong>DNS update</strong> (runs a script you supply to repoint your own DNS record, works across subnets but is only as fast as DNS caching allows).</li>
+          <li><strong>Peer host</strong> and both agent ports &mdash; how the two nodes find each other's health-check endpoint.</li>
+          <li>Health-check and replication timing, and whether a recovered node should <strong>auto-reclaim</strong> the primary role or wait for you to click <strong>Reclaim Primary Role</strong> yourself (the default &mdash; avoids flapping between two nodes on a flaky link).</li>
+        </ul>
+        <p><strong>Save Configuration</strong> writes the change and, if the agent is already running on that node, applies it live &mdash; enabling/disabling, timing, and mode changes take effect immediately, no restart. A brand-new setup still needs the agent's own service started once by hand on each VM.</p>
+      </div>
+      <div class="callout warn">
+        <span class="mark">Per-node, not shared</span>
+        <p>Each node's configuration is its own &mdash; role, peer address, and which side owns the virtual IP are necessarily different on the two VMs. Configure each one separately with its own (mirrored) values.</p>
+      </div>
+      <div class="card">
+        <h4>Watching it</h4>
+        <p>The same panel's status section shows this node's current role (Active/Standby), peer health, and last replication time. The <a href="#tab-dashboard">Dashboard</a>'s fleet topology diagram also shows a small linked node above the hub for an at-a-glance check without switching tabs.</p>
+      </div>
+    </section>
+
+    <section id="security">
+      <h2>Security notes</h2>
+      <ul>
+        <li>Site tunnels are outbound-only from the site's side &mdash; the hub never needs an inbound connection to a site to manage it.</li>
+        <li>Pin a site's own SSH host key fingerprint (available on that site's Central Office panel) and this hub's own fingerprint (Account tab) on both ends once, so a future connection to something impersonating either side gets rejected instead of silently trusted.</li>
+        <li>A read-only grant is enforced on the hub side, in the tunnel-bridging code itself &mdash; a read-only session's keystrokes never reach the wire toward the site at all, rather than being filtered after the fact.</li>
+        <li>Sync Admins is only ever triggered by an explicit hub-admin action; it never runs automatically as a side effect of anything else.</li>
+      </ul>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <div class="card">
+        <h4>A site shows Offline but I know the box is up</h4>
+        <p>Check that box's own Central Office panel is still set to <strong>Managed</strong> mode and pointed at the right hub host/port &mdash; a site only appears Online while its tunnel is actually connected.</p>
+      </div>
+      <div class="card">
+        <h4>A port shows red even though the site is Online</h4>
+        <p>That port's device isn't currently present on the site (only shown when the site's firmware reports port presence &mdash; older sites just reflect the site's own connection state for every port).</p>
+      </div>
+      <div class="card">
+        <h4>High Availability panel doesn't show a status section</h4>
+        <p>That node's <code>ha-agent</code> hasn't written a status file yet &mdash; either it isn't running, or it just started. The configuration form above it still works regardless, so you can prepare the config before the agent's service is even started.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="rule"></div>
+  <p>Central Office Hub &mdash; fleet management for a Serial Killer Terminal Server appliance fleet.</p>
+</footer>

@@ -1,0 +1,317 @@
+<title>Central Office Hub Quick Start</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #eef1ee;
+    --panel: #e3e8e2;
+    --panel-2: #dbe1da;
+    --ink: #1a231f;
+    --ink-dim: #4b5650;
+    --border: #c7d0c4;
+    --accent: #a8621f;
+    --accent-ink: #ffffff;
+    --ok: #3c7d5e;
+    --ok-bg: #dcece2;
+    --danger: #a13a2c;
+    --danger-bg: #f3e0da;
+    --code-bg: #dde3db;
+    --link: #8a5219;
+    --shadow: 0 1px 2px rgba(20, 30, 22, 0.06), 0 6px 20px rgba(20, 30, 22, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181a;
+      --panel: #1b2123;
+      --panel-2: #21282a;
+      --ink: #e7ece7;
+      --ink-dim: #9caba1;
+      --border: #333d38;
+      --accent: #d99a4e;
+      --accent-ink: #1a1206;
+      --ok: #6cbb93;
+      --ok-bg: #1c2f26;
+      --danger: #e08268;
+      --danger-bg: #33211c;
+      --code-bg: #232b28;
+      --link: #e2ab63;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181a;
+    --panel: #1b2123;
+    --panel-2: #21282a;
+    --ink: #e7ece7;
+    --ink-dim: #9caba1;
+    --border: #333d38;
+    --accent: #d99a4e;
+    --accent-ink: #1a1206;
+    --ok: #6cbb93;
+    --ok-bg: #1c2f26;
+    --danger: #e08268;
+    --danger-bg: #33211c;
+    --code-bg: #232b28;
+    --link: #e2ab63;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  a { color: var(--link); }
+  code, kbd {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.88em;
+  }
+  h1, h2, h3 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    text-wrap: balance;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .masthead-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 30px 32px 26px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .masthead img {
+    width: 48px;
+    height: 48px;
+    border-radius: 11px;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1.title {
+    font-size: clamp(24px, 4vw, 32px);
+    margin: 4px 0 0;
+  }
+  .subtitle {
+    color: var(--ink-dim);
+    margin: 4px 0 0;
+  }
+
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  .needs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 28px 0 40px;
+    box-shadow: var(--shadow);
+  }
+  .needs div {
+    background: var(--panel);
+    padding: 13px 16px;
+    font-size: 13.5px;
+  }
+  .needs .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 0; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 36px 50px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .steps > li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 15px; top: 34px; bottom: 2px;
+    width: 2px;
+    background: var(--border);
+  }
+  .steps h3 {
+    font-size: 17px;
+    margin: 4px 0 8px;
+  }
+  .steps p { margin: 0 0 8px; color: var(--ink-dim); }
+  .steps p:last-child { margin-bottom: 0; }
+  .steps p strong { color: var(--ink); font-weight: 600; }
+
+  pre.term {
+    background: #1c231f;
+    color: #d9e6dc;
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 10px 0 0;
+  }
+  pre.term .c2 { color: #e2ab63; }
+
+  .callout {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 10px;
+  }
+  .callout .mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+  .callout.warn { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+  .callout.warn .mark { background: var(--danger); color: #fff; }
+  .callout.tip { background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
+  .callout.tip .mark { background: var(--ok); color: #fff; }
+  .callout p { margin: 0; color: var(--ink); font-size: 14px; }
+
+  .next {
+    margin-top: 44px;
+    padding: 22px 24px;
+    border-radius: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .next h2 { font-size: 18px; margin: 0 0 6px; }
+  .next p { margin: 0; color: var(--ink-dim); }
+  .next a { font-weight: 600; }
+</style>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <img src="webui/assets/logo.png" alt="Central Office Hub logo" />
+    <div>
+      <div class="eyebrow">Quick Start</div>
+      <h1 class="title">Central Office Hub</h1>
+      <p class="subtitle">From a fresh VM to your first managed site, in six steps.</p>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <div class="needs">
+    <div><span class="k">Hardware</span>Any VM (VMware, VirtualBox, Proxmox, ESXi) or bare Linux host</div>
+    <div><span class="k">OS</span>Debian 12 (bookworm) or compatible, amd64</div>
+    <div><span class="k">Fleet</span>One or more Serial Killer Terminal Server appliances to enroll</div>
+    <div><span class="k">Network</span>Reachable from every site you plan to enroll</div>
+  </div>
+
+  <ol class="steps">
+    <li>
+      <h3>Deploy the VM</h3>
+      <p>Import the <code>central-office-hub.ova</code> appliance into your hypervisor (VMware Fusion/Workstation/ESXi, VirtualBox, or Proxmox), attaching your own cloud-init seed for SSH key, password, and hostname &mdash; it ships with no OS-level login baked in. The app itself starts on boot regardless of that configuration.</p>
+      <div class="callout tip">
+        <span class="mark">Installing on an existing host instead?</span>
+        <p>Run <code>provisioning/setup.sh</code> on any Debian-based Linux host to install alongside whatever else is already there &mdash; see the project <a href="README.md">README</a>.</p>
+      </div>
+    </li>
+    <li>
+      <h3>Log in to the admin UI</h3>
+      <p>Visit <code>https://&lt;vm-ip&gt;:8443</code> (accept the self-signed certificate warning) and sign in with <code>admin</code> / <code>letmein0!</code>.</p>
+      <div class="callout tip">
+        <span class="mark">First login</span>
+        <p>You'll be required to set a new password immediately &mdash; enforced by the server itself.</p>
+      </div>
+    </li>
+    <li>
+      <h3>Generate an enrollment token</h3>
+      <p><strong>Sites</strong> tab &rarr; <strong>+ Generate Token</strong>. Copy the token it shows you.</p>
+    </li>
+    <li>
+      <h3>Enroll a site</h3>
+      <p>On the appliance itself: <strong>Server</strong> tab &rarr; <strong>Central Office (Fleet)</strong> &rarr; switch to <strong>Managed</strong> &rarr; paste the token into <strong>Enroll with a token</strong> &rarr; <strong>Enroll</strong>. The site appears on this hub's <strong>Sites</strong> tab within moments, reporting its ports automatically.</p>
+    </li>
+    <li>
+      <h3>Create a group and grant access</h3>
+      <p><strong>Groups</strong> tab &rarr; <strong>+ Add Group</strong> &rarr; check the ports it should grant, choosing read-write or read-only per port &rarr; <strong>Save</strong>.</p>
+    </li>
+    <li>
+      <h3>Add a console user and connect</h3>
+      <p><strong>Users</strong> tab &rarr; <strong>+ Add User</strong> &rarr; set a password and assign the group you just created &rarr; <strong>Save</strong>. From any machine on the network:</p>
+      <pre class="term">ssh -p 2222 <span class="c2">&lt;username&gt;</span>@&lt;hub-host&gt;</pre>
+      <p>The port menu lists exactly what that user's groups grant &mdash; nothing more.</p>
+    </li>
+  </ol>
+
+  <div class="next">
+    <h2>Want the hub itself to survive a VM going down?</h2>
+    <p>Deploy a second VM the same way, then set up <strong>Account &rarr; High Availability</strong> on both &mdash; see the Handbook's <a href="HANDBOOK.html#high-availability">High availability</a> section. Fully optional; skip it and the hub works exactly the same as a single node.</p>
+  </div>
+
+  <div class="next">
+    <h2>That's the essentials.</h2>
+    <p>For access permissions, session capture, syslog forwarding, backup/restore, and everything else, see the full <a href="HANDBOOK.html">Handbook</a>.</p>
+  </div>
+
+</main>

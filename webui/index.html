@@ -54,15 +54,84 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="sites">Sites</button>
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="sites">Sites</button>
       <button class="tab-btn" data-tab="users">Users</button>
       <button class="tab-btn" data-tab="groups">Groups</button>
+      <button class="tab-btn" data-tab="network">Network</button>
+      <button class="tab-btn" data-tab="tftp">TFTP</button>
       <button class="tab-btn" data-tab="sessions">Sessions</button>
       <button class="tab-btn" data-tab="log">Log</button>
       <button class="tab-btn" data-tab="account">Account</button>
+      <button class="tab-btn" data-tab="about">About</button>
     </div>
 
-    <div class="tab-content active" id="tab-sites">
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="panel">
+        <h2>System</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">CPU</span>
+            <span class="stat-value" id="statCpu">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statCpuBar"></div></div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Memory</span>
+            <span class="stat-value" id="statMem">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statMemBar"></div></div>
+            <span class="stat-sub" id="statMemSub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Disk</span>
+            <span class="stat-value" id="statDisk">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statDiskBar"></div></div>
+            <span class="stat-sub" id="statDiskSub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Uptime</span>
+            <span class="stat-value" id="systemUptime">&mdash;</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Connected Clients</span>
+            <span class="stat-value" id="statClients">&mdash;</span>
+            <span class="stat-sub">SSH + web console sessions to this hub</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Fleet Topology</h2>
+        <p class="hint">Hub &rarr; sites &rarr; their reported ports. Updates live as sites connect, disconnect, or report new ports.</p>
+        <div class="topology-legend">
+          <span class="topology-legend-item"><span class="topology-dot online"></span>Online</span>
+          <span class="topology-legend-item"><span class="topology-dot offline"></span>Offline</span>
+        </div>
+        <div class="topology-wrap" id="topologyWrap">
+          <p class="hint" id="topologyEmpty">No sites enrolled yet.</p>
+          <svg id="topologySvg" hidden></svg>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>System Information</h2>
+        <table class="data-table" id="systemInfoTable">
+          <tbody>
+            <tr><th>Hostname</th><td id="infoHostname">&mdash;</td></tr>
+            <tr><th>Operating System</th><td id="infoOsRelease">&mdash;</td></tr>
+            <tr><th>Kernel</th><td id="infoKernel">&mdash;</td></tr>
+            <tr><th>Architecture</th><td id="infoArch">&mdash;</td></tr>
+            <tr><th>CPU</th><td id="infoCpu">&mdash;</td></tr>
+            <tr><th>Total Memory</th><td id="infoMemory">&mdash;</td></tr>
+            <tr><th>Disk</th><td id="infoDisk">&mdash;</td></tr>
+            <tr><th>Node.js</th><td id="infoNode">&mdash;</td></tr>
+            <tr><th>App Version</th><td id="infoAppVersion">&mdash;</td></tr>
+          </tbody>
+        </table>
+        <button id="refreshSystemInfoBtn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-sites">
       <div class="panel">
         <h2>Sites</h2>
         <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Its ports are reported automatically by heartbeat (every 30s, while it's in managed mode) &mdash; nothing to enter by hand.</p>
@@ -94,10 +163,17 @@
         <h2>Console Users</h2>
         <p class="hint">Console users reach ports through group grants only &mdash; they never see the admin UI. They can connect over SSH (any username other than an admin's or <code>_edge</code>) or the web console at <code>/terminal</code>.</p>
         <table class="data-table" id="usersTable">
-          <thead><tr><th>Username</th><th>Groups</th><th></th></tr></thead>
+          <thead><tr><th>Username</th><th>Groups</th><th>Capture</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
-        <button id="addUserBtn">+ Add User</button>
+        <div class="field-row">
+          <button id="addUserBtn">+ Add User</button>
+          <input type="file" id="importUsersInput" accept=".csv,text/csv" hidden />
+          <button id="importUsersBtn" class="secondary">Import from CSV&hellip;</button>
+          <button id="downloadUserTemplateBtn" class="secondary">Download CSV Template</button>
+        </div>
+        <p class="hint">CSV columns: <code>username, password, groups, capture</code>. <code>groups</code> is a semicolon- or comma-separated list of existing group names (unrecognized names are ignored, noted in the import summary). <code>capture</code> is <code>yes</code>/<code>true</code>/<code>1</code> to always capture this user's sessions (defaults to off). Only creates new accounts &mdash; a username that already exists is skipped, never overwritten.</p>
+        <div class="auth-error" id="importUsersMsg"></div>
       </div>
     </div>
 
@@ -113,14 +189,157 @@
       </div>
     </div>
 
+    <div class="tab-content" id="tab-network">
+      <div class="panel">
+        <h2>Interfaces</h2>
+        <table class="data-table" id="networkInterfacesTable">
+          <thead><tr><th>Interface</th><th>Type</th><th>Status</th><th>IP Address</th><th>Connection</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="networkInterfacesEmpty">No network interfaces detected.</p>
+        <div class="field-row">
+          <label>Public IP</label>
+          <span id="publicIpValue">&mdash;</span>
+        </div>
+        <div class="field-row">
+          <button id="refreshNetworkBtn">Refresh</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Static IP</h2>
+        <p class="hint">Relies on NetworkManager (<code>nmcli</code>). If this host doesn't run NetworkManager (common on a minimal Debian/cloud VM), saving here will show a clear error instead of silently doing nothing.</p>
+        <div class="field-row">
+          <label for="staticIpDevice">Interface</label>
+          <select id="staticIpDevice"></select>
+          <span class="status-pill" id="staticIpModePill">
+            <span class="dot"></span>
+            <span id="staticIpModeText">&mdash;</span>
+          </span>
+        </div>
+        <div class="field-row">
+          <label for="staticIpAddress">IP Address</label>
+          <input type="text" id="staticIpAddress" placeholder="192.168.1.50" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="staticIpMask">Subnet Mask</label>
+          <input type="text" id="staticIpMask" placeholder="255.255.255.0" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="staticIpGateway">Gateway</label>
+          <input type="text" id="staticIpGateway" placeholder="192.168.1.1" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <button id="saveStaticIpBtn" class="primary">Save</button>
+          <button id="clearStaticIpBtn" class="secondary">Use DHCP</button>
+        </div>
+        <p class="hint">A wrong address, mask, or gateway here can disconnect this interface from the network entirely, including cutting off the admin UI if you're reaching it through this interface. Double-check before saving &mdash; recovery needs SSH (via a different interface, if there is one) or the physical/hypervisor console.</p>
+        <div class="auth-error" id="staticIpMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Time &amp; DNS</h2>
+        <div class="field-row">
+          <label for="ntpServer">NTP Server</label>
+          <input type="text" id="ntpServer" placeholder="pool.ntp.org" autocomplete="off" />
+          <span class="status-pill" id="ntpSyncPill">
+            <span class="dot"></span>
+            <span id="ntpSyncText">Unknown</span>
+          </span>
+          <button id="saveNtpBtn">Save</button>
+        </div>
+        <div class="field-row">
+          <label for="timezoneInput">Timezone</label>
+          <select id="timezoneInput"></select>
+          <button id="saveTimezoneBtn">Save</button>
+        </div>
+        <div class="field-row">
+          <label for="dnsServers">DNS Servers</label>
+          <input type="text" id="dnsServers" placeholder="e.g. 1.1.1.1, 8.8.8.8" autocomplete="off" />
+          <button id="saveDnsBtn">Save</button>
+          <button id="clearDnsBtn" class="secondary">Use DHCP</button>
+        </div>
+        <p class="hint">IPv4 addresses only. DNS Servers shows what's currently in effect. Leave it as-is (or click Use DHCP) to keep using whatever your network hands out automatically.</p>
+        <div class="auth-error" id="timeDnsMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>System Control</h2>
+        <div class="field-row">
+          <label for="systemHostname">Hostname</label>
+          <input type="text" id="systemHostname" autocomplete="off" />
+          <button id="saveHostnameBtn">Save</button>
+        </div>
+        <div class="auth-error" id="systemControlMsg"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-tftp">
+      <div class="panel">
+        <h2>TFTP Server</h2>
+        <p class="hint">Off by default. Useful for pushing firmware or config files to network devices reachable from this hub.</p>
+        <div class="field-row">
+          <span>Status</span>
+          <span class="status-pill" id="tftpStatusPill">
+            <span class="dot"></span>
+            <span id="tftpStatusText">Stopped</span>
+          </span>
+          <button id="toggleTftpBtn" class="primary">Start Server</button>
+        </div>
+        <div class="field-row">
+          <label for="tftpPort">Listen Port</label>
+          <input type="number" id="tftpPort" min="1" max="65535" />
+        </div>
+        <div class="field-row">
+          <label for="tftpAllowUpload">Allow uploads</label>
+          <input type="checkbox" id="tftpAllowUpload" />
+        </div>
+        <div class="field-row">
+          <label for="tftpAutoStart">Start automatically on boot</label>
+          <input type="checkbox" id="tftpAutoStart" />
+        </div>
+        <div class="field-row">
+          <button id="saveTftpSettingsBtn">Save Settings</button>
+        </div>
+        <div class="field-row column">
+          <label>Root directory</label>
+          <pre class="code-block" id="tftpRootDir">/opt/central-office/data/tftp</pre>
+        </div>
+        <p class="hint">Changing the listen port requires stopping and starting the server. The standard TFTP port (69) needs no extra privileges here &mdash; the service is granted that capability directly.</p>
+      </div>
+
+      <div class="panel">
+        <h2>TFTP Directory</h2>
+        <table class="data-table" id="tftpFilesTable">
+          <thead><tr><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="tftpFilesEmpty">No files yet.</p>
+        <input type="file" id="tftpUploadInput" hidden />
+        <button id="tftpUploadBtn">+ Upload File</button>
+        <div class="auth-error" id="tftpUploadMsg"></div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-sessions">
       <div class="panel">
         <h2>Active Sessions</h2>
         <p class="hint">SSH and web console sessions, shown together.</p>
         <table class="data-table" id="sessionsTable">
-          <thead><tr><th>User</th><th>Method</th><th>Connected To</th><th>Since</th><th></th></tr></thead>
+          <thead><tr><th>User</th><th>Method</th><th>Connected To</th><th>Since</th><th>Traffic (RX / TX)</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
+      </div>
+
+      <div class="panel">
+        <h2>Session Captures</h2>
+        <p class="hint">Byte-for-byte logs of past sessions for users with capture enabled (Users tab).</p>
+        <table class="data-table" id="capturesTable">
+          <thead><tr><th>File</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="capturesEmpty">No captures yet.</p>
+        <button id="refreshCapturesBtn">Refresh</button>
       </div>
     </div>
 
@@ -128,6 +347,39 @@
       <div class="panel">
         <h2>Server Log</h2>
         <pre class="code-block log-view" id="logView"></pre>
+      </div>
+
+      <div class="panel">
+        <h2>External Syslog Server</h2>
+        <p class="hint">Mirrors audit log entries to an external syslog server (UDP, RFC 3164) as they happen.</p>
+        <div class="field-row">
+          <label for="syslogEnabled">Enabled</label>
+          <input type="checkbox" id="syslogEnabled" />
+        </div>
+        <div class="field-row">
+          <label for="syslogHost">Server host</label>
+          <input type="text" id="syslogHost" placeholder="syslog.example.com" autocomplete="off" />
+          <label for="syslogPort">Port</label>
+          <input type="number" id="syslogPort" min="1" max="65535" style="width: 6em" />
+        </div>
+        <div class="field-row">
+          <label for="syslogFacility">Facility</label>
+          <select id="syslogFacility">
+            <option value="16">local0</option>
+            <option value="17">local1</option>
+            <option value="18">local2</option>
+            <option value="19">local3</option>
+            <option value="20">local4</option>
+            <option value="21">local5</option>
+            <option value="22">local6</option>
+            <option value="23">local7</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <button id="saveSyslogBtn">Save Settings</button>
+          <button id="testSyslogBtn" class="secondary">Send Test Message</button>
+        </div>
+        <div class="auth-error" id="syslogMsg"></div>
       </div>
     </div>
 
@@ -228,19 +480,128 @@
         <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
       </div>
 
+      <div class="panel" id="haPanel">
+        <h2>High Availability</h2>
+        <p class="hint">Configures the standalone <code>ha-agent</code> process on THIS node only -- the peer node needs its own matching configuration with role/host swapped. Saving writes <code>ha-agent/config.json</code> and, if the agent is already running here, tells it to reload live. A brand-new agent still needs its systemd service started once by hand -- see the README's "High Availability" section.</p>
+
+        <div class="field-row">
+          <label for="haEnabled">Enable HA on this node</label>
+          <input type="checkbox" id="haEnabled" />
+        </div>
+        <div class="field-row">
+          <label for="haRoleSelect">Role</label>
+          <select id="haRoleSelect">
+            <option value="primary">Primary</option>
+            <option value="secondary">Secondary</option>
+          </select>
+          <label for="haModeSelect">Failover mode</label>
+          <select id="haModeSelect">
+            <option value="vip">Virtual IP</option>
+            <option value="dns">DNS update</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="haPeerHost">Peer host</label>
+          <input type="text" id="haPeerHost" placeholder="10.0.0.6" autocomplete="off" />
+          <label for="haListenPort">This node's agent port</label>
+          <input type="number" id="haListenPort" min="1" max="65535" style="width: 6em" placeholder="8555" />
+          <label for="haPeerPort">Peer's agent port</label>
+          <input type="number" id="haPeerPort" min="1" max="65535" style="width: 6em" placeholder="8555" />
+        </div>
+
+        <div id="haVipFields">
+          <div class="field-row">
+            <label for="haVipAddress">VIP address</label>
+            <input type="text" id="haVipAddress" placeholder="10.0.0.10" autocomplete="off" />
+            <label for="haVipPrefix">Prefix length</label>
+            <input type="number" id="haVipPrefix" min="0" max="32" style="width: 5em" placeholder="24" />
+            <label for="haVipInterface">Interface</label>
+            <input type="text" id="haVipInterface" placeholder="eth0" autocomplete="off" />
+          </div>
+        </div>
+        <div id="haDnsFields" hidden>
+          <div class="field-row">
+            <label for="haDnsCommand">DNS update command</label>
+            <input type="text" id="haDnsCommand" placeholder="/opt/central-office/ha-agent/dns-update.sh" autocomplete="off" style="width: 24em" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label for="haHcInterval">Health check interval (ms)</label>
+          <input type="number" id="haHcInterval" min="500" style="width: 7em" placeholder="3000" />
+          <label for="haHcThreshold">Failure threshold</label>
+          <input type="number" id="haHcThreshold" min="1" style="width: 5em" placeholder="3" />
+          <label for="haHcTimeout">Check timeout (ms)</label>
+          <input type="number" id="haHcTimeout" min="100" style="width: 7em" placeholder="2000" />
+        </div>
+        <div class="field-row">
+          <label for="haRepInterval">Replication interval (ms)</label>
+          <input type="number" id="haRepInterval" min="1000" style="width: 7em" placeholder="5000" />
+          <label for="haRepRemoteDir">Remote data dir</label>
+          <input type="text" id="haRepRemoteDir" placeholder="/opt/central-office/data" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="haRepSshUser">Replication SSH user</label>
+          <input type="text" id="haRepSshUser" placeholder="central-office" autocomplete="off" />
+          <label for="haRepSshKey">Replication SSH key path</label>
+          <input type="text" id="haRepSshKey" placeholder="/opt/central-office/ha-agent/replication-key" autocomplete="off" style="width: 20em" />
+        </div>
+        <div class="field-row">
+          <label for="haPreempt">Auto-reclaim primary role on recovery (preempt)</label>
+          <input type="checkbox" id="haPreempt" />
+        </div>
+        <div class="field-row">
+          <button id="haSaveConfigBtn">Save Configuration</button>
+          <button id="haReloadConfigBtn" class="secondary">Reload from Disk</button>
+        </div>
+        <div class="auth-error" id="haConfigMsg"></div>
+
+        <div id="haStatusSection" hidden>
+          <table class="data-table" id="haStatusTable">
+            <tbody>
+              <tr><th>Role</th><td id="haRole">&mdash;</td></tr>
+              <tr><th>Current state</th><td id="haIsActive">&mdash;</td></tr>
+              <tr><th>Failover mode</th><td id="haMode">&mdash;</td></tr>
+              <tr><th>Peer health</th><td id="haPeerHealth">&mdash;</td></tr>
+              <tr><th>Last replication</th><td id="haLastReplication">&mdash;</td></tr>
+              <tr><th>Last promoted</th><td id="haPromotedAt">&mdash;</td></tr>
+            </tbody>
+          </table>
+          <div class="field-row">
+            <button id="haRefreshBtn" class="secondary">Refresh Status</button>
+            <button id="haPromoteBtn" class="danger" hidden>Reclaim Primary Role</button>
+          </div>
+        </div>
+        <div class="auth-error" id="haMsg"></div>
+      </div>
+
       <div class="panel">
-        <h2>Version &amp; Updates</h2>
-        <p class="hint">Running version <strong id="currentVersion">&hellip;</strong>. Applying an update briefly restarts this service &mdash; active tunnels reconnect on their own, and web/SSH sessions disconnect and need to reconnect.</p>
-        <div class="field-row">
-          <button id="checkUpdateBtn">Check for Updates</button>
+        <h2>TLS Certificate</h2>
+        <p class="hint">Covers this admin UI's own HTTPS certificate (port 8444 in this local setup, 8443 by default). A self-signed one is generated automatically on first boot; upload your own (from an internal CA, or Let's Encrypt via a DNS challenge) to replace it.</p>
+        <table class="data-table" id="tlsInfoTable">
+          <tbody>
+            <tr><th>Type</th><td id="tlsType">&mdash;</td></tr>
+            <tr><th>Subject</th><td id="tlsSubject">&mdash;</td></tr>
+            <tr><th>Issuer</th><td id="tlsIssuer">&mdash;</td></tr>
+            <tr><th>Valid</th><td id="tlsValidity">&mdash;</td></tr>
+            <tr><th>Fingerprint (SHA-256)</th><td><code id="tlsFingerprint">&mdash;</code></td></tr>
+          </tbody>
+        </table>
+        <div class="field-row column">
+          <label for="tlsCertFile">Certificate file (PEM)</label>
+          <input type="file" id="tlsCertFile" accept=".pem,.crt,.cer,.cert" />
         </div>
-        <p class="hint" id="updateStatus"></p>
-        <div class="field-row">
-          <button id="applyUpdateBtn" class="primary" hidden>Apply Update</button>
-          <button id="rollbackUpdateBtn" class="danger" hidden>Roll Back to Previous Version</button>
+        <div class="field-row column">
+          <label for="tlsKeyFile">Private key file (PEM)</label>
+          <input type="file" id="tlsKeyFile" accept=".pem,.key" />
         </div>
-        <p class="hint" id="updateProgress"></p>
-        <p><a href="https://github.com/TerryHenry/central-office-hub/releases" target="_blank" rel="noopener">View all releases on GitHub</a></p>
+        <div class="field-row">
+          <button id="uploadTlsCertBtn" class="primary">Upload</button>
+          <button id="revertTlsCertBtn" class="secondary">Revert to Self-Signed</button>
+          <button id="restartServiceBtn" class="secondary">Restart Service Now</button>
+        </div>
+        <p class="hint">A change here needs the service to restart before it takes effect &mdash; active tunnels reconnect on their own, and web/SSH sessions briefly disconnect.</p>
+        <div class="auth-error" id="tlsMsg"></div>
       </div>
 
       <div class="panel">
@@ -267,6 +628,32 @@
           <button id="restoreBtn" class="danger">Restore from Backup</button>
         </div>
         <div class="auth-error" id="restoreMsg"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-about">
+      <div class="panel about-panel">
+        <img class="about-logo" src="assets/logo.png" alt="Serial Killer Terminal Server" />
+        <h2>Central Office</h2>
+        <p class="version-tag">Version <span id="currentVersion">&hellip;</span></p>
+        <p>Fleet management hub for a Serial Killer Terminal Server appliance fleet.</p>
+        <p>Written by Terry Henry</p>
+        <p>For comments and suggestions, email <a href="mailto:skterminalserver@gmail.com">skterminalserver@gmail.com</a></p>
+        <p><a href="https://github.com/TerryHenry/central-office-hub" target="_blank" rel="noopener">View on GitHub</a></p>
+      </div>
+      <div class="panel">
+        <h2>Version &amp; Updates</h2>
+        <p class="hint">Applying an update briefly restarts this service &mdash; active tunnels reconnect on their own, and web/SSH sessions disconnect and need to reconnect.</p>
+        <div class="field-row">
+          <button id="checkUpdateBtn">Check for Updates</button>
+        </div>
+        <p class="hint" id="updateStatus"></p>
+        <div class="field-row">
+          <button id="applyUpdateBtn" class="primary" hidden>Apply Update</button>
+          <button id="rollbackUpdateBtn" class="danger" hidden>Roll Back to Previous Version</button>
+        </div>
+        <p class="hint" id="updateProgress"></p>
+        <p><a href="https://github.com/TerryHenry/central-office-hub/releases" target="_blank" rel="noopener">View all releases on GitHub</a></p>
       </div>
     </div>
   </div>
@@ -366,6 +753,11 @@
       <div class="field-row column">
         <label>Groups</label>
         <div id="userGroupChecks" class="check-list"></div>
+      </div>
+      <div class="field-row">
+        <label for="userCaptureEnabled">Capture this user's sessions</label>
+        <input type="checkbox" id="userCaptureEnabled" />
+        <span class="hint">Always logs their sessions to file, on any site/port. Off by default.</span>
       </div>
       <input type="hidden" id="userEditId" />
       <div class="modal-actions">

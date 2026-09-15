@@ -5,6 +5,11 @@ appliance fleet. Edge boxes tunnel out to this hub over SSH (no inbound port nee
 the wiring closet); the hub gives operators one place to reach every enrolled site's
 serial ports, over SSH or a browser-based console, without exposing each box directly.
 
+This README covers building and deploying the hub itself. Already have it running and
+just want to enroll a site? See [QUICKSTART.html](QUICKSTART.html). For the full
+reference -- the web admin UI, permissions, session capture, syslog forwarding, and
+high availability -- see [HANDBOOK.html](HANDBOOK.html).
+
 ## What it does
 
 - **Reverse-tunnel site enrollment** -- an edge box connects out to this hub and
@@ -65,6 +70,61 @@ The shipped image carries no baked-in OS-level login -- attach your own cloud-in
 (SSH key, password, hostname) at deploy time, the same way any generic cloud image is
 customized. The app itself starts regardless of that configuration; once it's up, reach
 the admin UI at `https://<vm-ip>:8443`.
+
+## High availability (optional, two bare VMs)
+
+Automatic failover across two hub VMs, for anyone who can't rely on a cloud load
+balancer. A separate always-running process, `ha-agent.js`, handles this -- the main
+app itself has no failover logic and doesn't need to know HA exists. See
+`ha-agent.js`'s own top-of-file comment for the full design rationale; summary:
+
+- The agent health-checks its peer's agent on a private management port. After
+  `healthCheck.failureThreshold` consecutive failed checks, a standby promotes itself:
+  final `rsync` pull of the peer's `data/` directory, claim the virtual IP (or run your
+  own DNS-update script), then start `central-office.service`.
+- Whichever node is standby keeps the main service **stopped** and periodically pulls
+  the active node's data -- never half-running against stale state.
+- No automatic failback: a recovered primary comes back as a healthy standby and stays
+  there until an admin clicks **Reclaim Primary Role** in the Account tab (or sets
+  `preemptOnRecovery: true` for classic auto-preempt behavior).
+- Two addressing modes, chosen per your network: `"vip"` (a floating IP via `ip addr`
+  + gratuitous ARP -- needs both VMs on the same L2 segment, fails over in seconds) or
+  `"dns"` (runs an admin-supplied script to update your own DNS provider -- works across
+  subnets, but failover speed is limited by DNS TTL/caching).
+- With only two nodes, true split-brain prevention isn't fully solvable without a third
+  tie-breaker, which this doesn't implement -- `failureThreshold` (default 3, not 1) is
+  the main defense against a false promotion from a transient blip, not a partition.
+
+### Setup (run on both VMs)
+
+1. Provision the main app normally first (`provisioning/setup.sh`, above).
+2. `sudo bash provisioning/ha-setup.sh` -- creates the `central-office-ha` service
+   account, installs `ha-agent.service`, and grants it the narrow sudoers rule it needs
+   to start/stop the main service. It does **not** need `ha-agent-config.example.json`
+   copied by hand anymore -- the next step does that from the web UI.
+3. Log into the admin UI for **this** node and open the Account tab's **High
+   Availability** panel. Fill in `role` (`primary` on one VM, `secondary` on the
+   other), `peerHost`, `listenPort`/`peerPort` (same number on both nodes is simplest,
+   since each is a different host), and either the VIP fields or a DNS update command,
+   then **Save Configuration**. This writes `/opt/central-office/ha-agent/config.json`
+   directly -- if `ha-agent.service` is already running on this node it also applies
+   the change live (interval/threshold/mode/enabled changes take effect immediately, no
+   restart); if the service isn't running yet, saving just prepares the file for step 5.
+   Repeat on the peer node with its own (swapped) values.
+4. Set up cross-VM SSH trust for replication -- not automated, since it's a one-time,
+   security-sensitive step: generate a keypair, put the private half at the
+   `sshKeyPath` your config points to, and add the public half to the **peer's**
+   `central-office` account's `~/.ssh/authorized_keys`, restricted to rsync only:
+   ```
+   command="rsync --server --sender -logDtprze.iLsfxCIvu . /opt/central-office/data",restrict ssh-ed25519 AAAA...
+   ```
+5. `sudo systemctl enable --now ha-agent.service` on both nodes.
+
+The same **High Availability** panel's status section (visible once `ha-agent` has
+written its first status) shows current role, peer health, last replication time, and
+the manual failback button. `ha-agent-config.example.json` is still in the repo as a
+reference for the config shape, but hand-editing the file directly is no longer the
+expected path -- use the panel, which validates input before writing it.
 
 ## Applying updates
 
