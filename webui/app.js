@@ -223,6 +223,20 @@ function localAccessPill(site) {
   return `<br><span class="pill mute" title="Local ${disabled.join(' and ')} access is disabled on this box"><span class="dot"></span>Local ${escapeHtml(disabled.join(' + '))} disabled</span>`;
 }
 
+/** Whether this site's local admin accounts (as of its last heartbeat) match the hub's
+ * own -- the confirmation "Sync Admins" actually took effect, since there's no other way
+ * to check that against a real remote box short of trying to log into it. null (unknown)
+ * stays silent: no heartbeat with this field yet, e.g. an older edge version. */
+function adminsSyncPill(site) {
+  if (site.adminsSynced === true) {
+    return '<br><span class="pill ok" title="This site\'s local admin accounts match the hub\'s exactly"><span class="dot"></span>Admins in sync</span>';
+  }
+  if (site.adminsSynced === false) {
+    return '<br><span class="pill warn" title="This site\'s local admin accounts do NOT match the hub\'s -- Sync Admins hasn\'t been applied, or something changed since"><span class="dot"></span>Admins not in sync</span>';
+  }
+  return '';
+}
+
 async function loadSites() {
   const sites = await api.get('/api/sites');
   const tbody = document.querySelector('#sitesTable tbody');
@@ -247,7 +261,7 @@ async function loadSites() {
     tr.innerHTML = `
       <td><input type="checkbox" class="site-select" data-site="${site.id}" /></td>
       <td>${escapeHtml(site.name)}</td>
-      <td>${statusPill(site.connected)}${localAccessPill(site)}</td>
+      <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}</td>
       <td>${versionInfo}</td>
       <td>${lastSeen}</td>
       <td>${backupInfo}</td>
