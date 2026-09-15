@@ -238,10 +238,10 @@ async function loadSites() {
     `;
     const actionsCell = tr.lastElementChild;
     const queueBtn = document.createElement('button');
-    queueBtn.textContent = 'Queue Update';
+    queueBtn.textContent = 'Upgrade Version';
     queueBtn.addEventListener('click', async () => {
       await api.post(`/api/sites/${site.id}/queue-update`);
-      alert(`An update was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
+      alert(`An upgrade was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
     });
     const requestBackupBtn = document.createElement('button');
     requestBackupBtn.textContent = 'Request Backup';
@@ -297,9 +297,9 @@ document.getElementById('bulkQueueUpdateBtn').addEventListener('click', async ()
     alert('Select at least one site first.');
     return;
   }
-  if (!confirm(`Queue an update for ${siteIds.length} site${siteIds.length === 1 ? '' : 's'}? Each applies on its own next heartbeat.`)) return;
+  if (!confirm(`Upgrade ${siteIds.length} site${siteIds.length === 1 ? '' : 's'}? Each applies on its own next heartbeat.`)) return;
   const result = await api.post('/api/sites/queue-update/bulk', { siteIds });
-  alert(`Queued an update for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+  alert(`Queued an upgrade for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
 });
 
 function openSiteRestoreModal(site) {
