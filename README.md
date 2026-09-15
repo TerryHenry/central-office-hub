@@ -47,22 +47,24 @@ This installs Node.js (via NodeSource, if not already present), creates an unpri
 grants that account a narrowly-scoped `sudoers.d` rule limited to restarting its own
 service -- the same privilege model the appliance itself uses.
 
-### Option B: VM appliance
+### Option B: VM appliance (OVA)
 
 ```bash
 ./build-vm.sh
 ```
 
-Builds a self-contained qcow2 image: a Debian 12 (bookworm, arm64) "genericcloud" base
-with the hub app already installed and its systemd service enabled, so it starts on
-boot with no further setup. Requires Docker Desktop (used only as a throwaway Linux
-environment to run QEMU + cloud-init during the build -- this host doesn't need a
-working QEMU toolchain of its own). Output: `build/central-office-hub.qcow2`.
+Builds a self-contained OVA: a Debian 12 (bookworm, amd64) "genericcloud" base with the
+hub app already installed and its systemd service enabled, so it starts on boot with no
+further setup. Requires Docker Desktop (used only as a throwaway Linux environment to
+run QEMU + cloud-init during the build -- this host doesn't need a working QEMU
+toolchain of its own) and VirtualBox's `VBoxManage` CLI (used only to package the
+already-provisioned disk into a real OVA by registering a throwaway VM around it and
+exporting -- that VM is never powered on). Output: `build/central-office-hub.ova`.
 
 The shipped image carries no baked-in OS-level login -- attach your own cloud-init seed
-(SSH key, password, hostname) at deploy time in UTM, Proxmox, or plain QEMU, the same
-way any generic cloud image is customized. The app itself starts regardless of that
-configuration; once it's up, reach the admin UI at `https://<vm-ip>:8443`.
+(SSH key, password, hostname) at deploy time, the same way any generic cloud image is
+customized. The app itself starts regardless of that configuration; once it's up, reach
+the admin UI at `https://<vm-ip>:8443`.
 
 ## Applying updates
 
@@ -102,7 +104,9 @@ gh release create vX.Y build/central-office-app.tar.gz build/central-office-app.
   hub's fingerprint into its own fleet panel); a blank fingerprint there means the
   tunnel is unverified, matching this project's default-open, opt-in-to-harden posture
   throughout.
-- `build-vm.sh` targets arm64 guests (matches Apple Silicon hosts, for fast HVF-backed
-  playback in UTM later) -- the build itself runs under software emulation inside
-  Docker regardless of host architecture, so it works the same on Intel Macs, just
-  slower.
+- `build-vm.sh` targets amd64 guests, not arm64 -- an OVA is meant to import into
+  whatever hypervisor the operator already has (VMware Fusion/Workstation/ESXi,
+  VirtualBox, Proxmox), and virtually all of those assume an x86_64 guest. The build
+  itself runs under full software emulation regardless of host architecture (Docker
+  Desktop doesn't expose HVF/KVM to a nested container), so it's markedly slower on
+  Apple Silicon than a same-architecture build would be, but still just a few minutes.

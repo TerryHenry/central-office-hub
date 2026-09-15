@@ -1,22 +1,47 @@
 #!/bin/bash
-# Builds a bootable VM appliance (qcow2) for the Central Office hub: a Debian 12
-# (bookworm) "genericcloud" image with the hub app pre-installed, its systemd service
-# enabled, and cloud-init left in place for whoever deploys it to configure (SSH keys,
-# hostname, network) at their own boot time -- the app starts regardless of that config.
+# Builds a bootable VM appliance (OVA) for the Central Office hub: a Debian 12
+# (bookworm, amd64) "genericcloud" image with the hub app pre-installed, its systemd
+# service enabled, and cloud-init left in place for whoever deploys it to configure
+# (SSH keys, hostname, network) at their own boot time -- the app starts regardless of
+# that config.
 #
-# Runs the actual QEMU boot (needed to let cloud-init provision the disk image) inside a
-# throwaway Debian container, since this host doesn't have a working QEMU toolchain of its
-# own (Homebrew's qemu has no prebuilt bottle for this macOS version and wants to compile
-# from source; UTM's bundled QEMU isn't a directly-executable CLI binary). Docker Desktop
-# already provides the Linux environment QEMU + its usual packaging want.
+# amd64, not arm64: an OVA is meant to import into whatever hypervisor the operator
+# already has (VMware Fusion/Workstation/ESXi, VirtualBox, Proxmox), and virtually all
+# of those assume an x86_64 guest -- an arm64 image would only boot on hosts that
+# themselves support ARM64 guests. The tradeoff is build speed: this host is Apple
+# Silicon, so building an amd64 image means the whole boot is software-emulated with no
+# hardware acceleration (same as the arm64-on-arm64 case, since Docker Desktop doesn't
+# expose HVF/KVM to a nested container either) -- just translating a different
+# instruction set on top, which is markedly slower.
+#
+# Two tools do the work, neither of which this host has natively:
+#   - QEMU (to run the actual boot + cloud-init provisioning) inside a throwaway
+#     Debian container, since Homebrew's qemu has no prebuilt bottle for this macOS
+#     version and UTM's bundled QEMU isn't a directly-executable CLI binary.
+#   - VBoxManage (VirtualBox's CLI, already installed on this Mac) to package the
+#     provisioned disk into a real, spec-correct OVA -- it registers a throwaway VM
+#     around the disk and exports it, rather than this script hand-writing OVF XML it
+#     has no way to validate against an actual hypervisor.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
 REPO="TerryHenry/central-office-hub"
-DEBIAN_IMG_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-arm64.qcow2"
-OUTPUT_QCOW2="$BUILD_DIR/central-office-hub.qcow2"
+DEBIAN_IMG_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+OUTPUT_OVA="$BUILD_DIR/central-office-hub.ova"
 DISK_SIZE="4G"
+VM_NAME="central-office-hub-export-$$"
+
+command -v VBoxManage >/dev/null 2>&1 || {
+  echo "FATAL: VBoxManage not found -- install VirtualBox (used only to package the" >&2
+  echo "already-built disk into a real OVA; the VM itself is never powered on)." >&2
+  exit 1
+}
+
+cleanup() {
+  VBoxManage unregistervm "$VM_NAME" --delete >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
 mkdir -p "$BUILD_DIR"
 
@@ -27,8 +52,8 @@ CHECKSUM_URL=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; d=json.load(s
 RELEASE_TAG=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
 echo "    $RELEASE_TAG -- $TARBALL_URL"
 
-echo "==> Downloading base image (Debian 12 genericcloud, arm64)..."
-BASE_IMG="$BUILD_DIR/debian-12-genericcloud-arm64.qcow2"
+echo "==> Downloading base image (Debian 12 genericcloud, amd64)..."
+BASE_IMG="$BUILD_DIR/debian-12-genericcloud-amd64.qcow2"
 if [ ! -f "$BASE_IMG" ]; then
   curl -fL --progress-bar -o "$BASE_IMG" "$DEBIAN_IMG_URL"
 else
@@ -101,7 +126,7 @@ sync
 poweroff
 USERDATA
 
-echo "==> Building qcow2 image inside a throwaway Debian container (installs QEMU there -- this host has none)..."
+echo "==> Booting VM to run provisioning (amd64 under full software emulation -- this can take a while)..."
 docker run --rm \
   -v "$BUILD_DIR:/build" \
   debian:bookworm \
@@ -109,30 +134,18 @@ docker run --rm \
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq --no-install-recommends qemu-system-arm qemu-utils qemu-efi-aarch64 cloud-image-utils genisoimage >/dev/null
+    apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils genisoimage >/dev/null
 
     qemu-img resize /build/work.qcow2 '"$DISK_SIZE"'
 
     cloud-localds /build/seed.iso /build/seed/user-data /build/seed/meta-data
 
-    # -M virt requires both pflash slots to be exactly 64MiB; Debian bookworm ships a
-    # smaller QEMU_EFI.fd, so pad a working copy of it out to that size rather than use
-    # the (read-only, system-owned) package file directly.
-    FW_SRC=/usr/share/qemu-efi-aarch64/QEMU_EFI.fd
-    FW=/build/efi-code.fd
-    cp "$FW_SRC" "$FW"
-    truncate -s 64M "$FW"
-    FW_VARS=/build/efi-vars.fd
-    truncate -s 64M "$FW_VARS"
-
-    echo "==> Booting VM to run provisioning (this can take several minutes)..."
-    timeout 1800 qemu-system-aarch64 \
-      -M virt -cpu max -accel tcg -smp 2 -m 2048 \
-      -drive if=pflash,format=raw,readonly=on,file="$FW" \
-      -drive if=pflash,format=raw,file="$FW_VARS" \
+    echo "==> Booting VM to run provisioning (this can take a long while under emulation)..."
+    timeout 3600 qemu-system-x86_64 \
+      -M pc -cpu max -accel tcg -smp 2 -m 2048 \
       -drive file=/build/work.qcow2,if=virtio,format=qcow2 \
       -drive file=/build/seed.iso,if=virtio,format=raw,media=cdrom \
-      -netdev user,id=net0 -device virtio-net-pci,netdev=net0,romfile= \
+      -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
       -nographic -serial file:/build/serial.log \
       || { echo "QEMU exited non-zero or timed out"; }
 
@@ -145,19 +158,31 @@ if ! grep -q "BUILD_OK" "$BUILD_DIR/serial.log"; then
   exit 1
 fi
 
-echo "==> Compressing final image..."
+echo "==> Converting provisioned disk to VDI (VirtualBox's native format)..."
 docker run --rm -v "$BUILD_DIR:/build" debian:bookworm bash -c '
   apt-get update -qq && apt-get install -y -qq --no-install-recommends qemu-utils >/dev/null
-  qemu-img convert -O qcow2 -c /build/work.qcow2 /build/central-office-hub.qcow2
+  qemu-img convert -O vdi /build/work.qcow2 /build/central-office-hub.vdi
 '
 
-rm -rf "$SEED_DIR" "$BUILD_DIR/seed.iso" "$BUILD_DIR/work.qcow2" "$BUILD_DIR/efi-vars.fd"
+echo "==> Packaging as OVA (registering a throwaway VirtualBox VM around the disk, never powered on)..."
+VDI_PATH="$(cd "$BUILD_DIR" && pwd -P)/central-office-hub.vdi"
+VBoxManage createvm --name "$VM_NAME" --ostype Debian_64 --register
+VBoxManage modifyvm "$VM_NAME" --memory 2048 --cpus 2 --nic1 nat --audio none
+VBoxManage storagectl "$VM_NAME" --name "SATA Controller" --add sata --controller IntelAhci
+VBoxManage storageattach "$VM_NAME" --storagectl "SATA Controller" --port 0 --device 0 --type hdd --medium "$VDI_PATH"
+rm -f "$OUTPUT_OVA"
+VBoxManage export "$VM_NAME" --output "$OUTPUT_OVA" --manifest --options nomacs \
+  --vsys 0 --product "Central Office Hub" --version "$RELEASE_TAG" \
+  --description "Fleet management hub for a Serial Killer Terminal Server appliance fleet. No OS-level login is baked in -- attach your own cloud-init/answer-file at deploy time. The app itself starts on boot regardless, at https://<vm-ip>:8443."
+
+rm -rf "$SEED_DIR" "$BUILD_DIR/seed.iso" "$BUILD_DIR/work.qcow2" "$BUILD_DIR/central-office-hub.vdi"
 
 echo
-echo "Done. VM appliance image:"
-echo "  $OUTPUT_QCOW2"
+echo "Done. VM appliance:"
+echo "  $OUTPUT_OVA"
 echo
-echo "Boot it with UTM, Proxmox, or plain QEMU (arm64 host). It ships with no OS-level"
-echo "login configured -- attach your own cloud-init seed (SSH key, password, hostname)"
-echo "at deploy time, the same way any cloud image is normally customized. The Central"
-echo "Office admin UI comes up on its own regardless, at https://<vm-ip>:8443."
+echo "Import it into VMware Fusion/Workstation/ESXi, VirtualBox, or Proxmox. It ships"
+echo "with no OS-level login configured -- attach your own cloud-init seed (SSH key,"
+echo "password, hostname) at deploy time, the same way any generic cloud image is"
+echo "customized. The Central Office admin UI comes up on its own regardless, at"
+echo "https://<vm-ip>:8443."
