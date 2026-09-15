@@ -175,6 +175,42 @@ VBoxManage export "$VM_NAME" --output "$OUTPUT_OVA" --manifest --options nomacs 
   --vsys 0 --product "Central Office Hub" --version "$RELEASE_TAG" \
   --description "Fleet management hub for a Serial Killer Terminal Server appliance fleet. No OS-level login is baked in -- attach your own cloud-init/answer-file at deploy time. The app itself starts on boot regardless, at https://<vm-ip>:8443."
 
+echo "==> Patching OVF for ESXi/VMware compatibility..."
+# VBoxManage's OVF is spec-legal but trips two well-known VirtualBox-vs-ESXi
+# incompatibilities: it writes the memory item's AllocationUnits as the human string
+# "MegaBytes" where ESXi's strict importer requires the DMTF programmatic form
+# ("byte * 2^20"), and it stamps VirtualSystemType as "virtualbox-2.2", a hardware
+# family ESXi doesn't recognize at all (it wants "vmx-*" version strings). Either one
+# alone produces ESXi's generic "error creating the import specification" with no
+# further detail -- there's no diagnostic to react to, just these two known fixes.
+PKG_DIR="$BUILD_DIR/ova-pkg"
+rm -rf "$PKG_DIR"
+mkdir -p "$PKG_DIR"
+tar -xf "$OUTPUT_OVA" -C "$PKG_DIR"
+OVF_FILE=$(find "$PKG_DIR" -maxdepth 1 -name '*.ovf')
+VMDK_FILE=$(find "$PKG_DIR" -maxdepth 1 -name '*.vmdk')
+MF_FILE=$(find "$PKG_DIR" -maxdepth 1 -name '*.mf')
+VMDK_BASENAME=$(basename "$VMDK_FILE")
+VMDK_SIZE=$(stat -f%z "$VMDK_FILE")
+
+sed -i '' \
+  -e 's|<rasd:AllocationUnits>MegaBytes</rasd:AllocationUnits>|<rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>|' \
+  -e 's|<vssd:VirtualSystemType>virtualbox-2\.2</vssd:VirtualSystemType>|<vssd:VirtualSystemType>vmx-07 vmx-08 vmx-09 vmx-10 vmx-11 vmx-13 vmx-14 vmx-15 vmx-16 vmx-17 vmx-18 vmx-19 vmx-20 vmx-21</vssd:VirtualSystemType>|' \
+  -e "s|ovf:href=\"$VMDK_BASENAME\"/>|ovf:href=\"$VMDK_BASENAME\" ovf:size=\"$VMDK_SIZE\"/>|" \
+  "$OVF_FILE"
+
+# The manifest hashes the .ovf itself, so it has to be recomputed after editing it --
+# the .vmdk is untouched, so its hash carries over as-is.
+printf 'SHA1 (%s) = %s\nSHA1 (%s) = %s\n' \
+  "$(basename "$OVF_FILE")" "$(shasum -a 1 "$OVF_FILE" | awk '{print $1}')" \
+  "$VMDK_BASENAME" "$(shasum -a 1 "$VMDK_FILE" | awk '{print $1}')" > "$MF_FILE"
+
+# macOS's default `tar` output isn't just non-portable here -- it's read by neither
+# ESXi nor VirtualBox's own importer ("Document is empty"). --format ustar is required.
+rm -f "$OUTPUT_OVA"
+(cd "$PKG_DIR" && tar --format ustar -cf "$OUTPUT_OVA" "$(basename "$OVF_FILE")" "$VMDK_BASENAME" "$(basename "$MF_FILE")")
+rm -rf "$PKG_DIR"
+
 rm -rf "$SEED_DIR" "$BUILD_DIR/seed.iso" "$BUILD_DIR/work.qcow2" "$BUILD_DIR/central-office-hub.vdi"
 
 echo
