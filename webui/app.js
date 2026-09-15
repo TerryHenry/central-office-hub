@@ -213,7 +213,7 @@ async function loadSites() {
   for (const site of sites) {
     const tr = document.createElement('tr');
     const portsList = site.ports.length
-      ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code>${escapeHtml(p.id)}</code></div>`).join('')
+      ? site.ports.map((p) => `<div>${escapeHtml(p.label)} <code class="port-id">${escapeHtml(p.id)}</code></div>`).join('')
       : '<span class="hint">none reported yet</span>';
     const lastSeen = site.lastSeenAt ? new Date(site.lastSeenAt).toLocaleString() : '<span class="hint">never</span>';
     const backupInfo = site.lastBackup
@@ -283,6 +283,12 @@ async function loadSites() {
 
 document.getElementById('sitesSelectAll').addEventListener('change', (e) => {
   document.querySelectorAll('#sitesTable .site-select').forEach((cb) => (cb.checked = e.target.checked));
+});
+
+document.getElementById('revealPortIdsBtn').addEventListener('click', (e) => {
+  const table = document.getElementById('sitesTable');
+  const revealed = table.classList.toggle('reveal-ids');
+  e.target.textContent = revealed ? 'Hide Port IDs' : 'Reveal Port IDs';
 });
 
 document.getElementById('bulkQueueUpdateBtn').addEventListener('click', async () => {
