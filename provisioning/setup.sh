@@ -50,6 +50,36 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# NetworkManager (nmcli) isn't part of a minimal Debian genericcloud image, but the
+# Network tab's DNS/static-IP settings depend on it -- install it and hand this box's
+# interface(s) over to it now, rather than leaving that as a manual step an admin has to
+# rediscover. Found the hard way: a fresh VM's interface comes up "unmanaged" by
+# NetworkManager because cloud-init's own generated netplan config defaults to the
+# networkd renderer, and cloud-init regenerates that file on every boot, so a one-off
+# manual fix reverts on the next reboot unless cloud-init's own network management is
+# also turned off.
+echo "==> Installing NetworkManager for Network tab DNS/static-IP support..."
+retry apt-get install -y --no-install-recommends network-manager
+if [ $? -ne 0 ]; then
+  echo "WARNING: failed to install network-manager -- Network tab DNS/static-IP settings won't work" >&2
+else
+  mkdir -p /etc/cloud/cloud.cfg.d
+  cat > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg <<'EOF'
+network: {config: disabled}
+EOF
+
+  # Idempotent: skip any netplan file that already specifies a renderer, so re-running
+  # this script (or running it against an already-fixed VM) is harmless.
+  for f in /etc/netplan/*.yaml; do
+    [ -f "$f" ] || continue
+    if ! grep -q '^[[:space:]]*renderer:' "$f"; then
+      sed -i '/^network:/a\  renderer: NetworkManager' "$f"
+    fi
+  done
+  chmod 600 /etc/netplan/*.yaml 2>/dev/null || true
+  netplan apply || echo "WARNING: netplan apply failed -- interface may still show as unmanaged in nmcli" >&2
+fi
+
 # Debian's own "npm" package drags in a large tree of separately-packaged "node-*"
 # modules whose versions frequently don't resolve against each other. NodeSource's own
 # repo ships a self-contained Node.js + npm build instead.
