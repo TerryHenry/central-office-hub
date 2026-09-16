@@ -260,6 +260,18 @@ function adminsSyncPill(site) {
   return '';
 }
 
+/** Whether this site has pinned the hub's SSH host key -- as of the security fix that
+ * signs every hub-pushed command, a site that hasn't pinned it silently discards every
+ * command the hub sends (updates, backup restore, admin sync, port/access/TFTP config)
+ * rather than erroring, so this is the only visible sign anything's wrong. null/unknown
+ * stays silent, same convention as adminsSyncPill above (older edge version). */
+function commandVerificationPill(site) {
+  if (site.hubKeyPinned === false) {
+    return '<br><span class="pill warn" title="This site has not pinned this hub\'s SSH host key -- it refuses every command the hub pushes (updates, backup restore, admin sync, port/access/TFTP config) rather than trusting one unverified. Pin this hub\'s fingerprint (Account tab) in the site\'s own Central Office panel to fix."><span class="dot"></span>Hub commands unverified</span>';
+  }
+  return '';
+}
+
 // ---------- Fleet topology diagram (Dashboard tab) ----------
 // Ports carry their own reported `present` flag from the edge box's heartbeat when
 // available (see configStore.recordHeartbeat) and fall back to the site's tunnel state
@@ -498,7 +510,7 @@ async function loadSites() {
     tr.innerHTML = `
       <td><input type="checkbox" class="site-select" data-site="${site.id}" ${previouslyChecked.has(site.id) ? 'checked' : ''} /></td>
       <td>${escapeHtml(site.name)}</td>
-      <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}</td>
+      <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}${commandVerificationPill(site)}</td>
       <td>${versionInfo}</td>
       <td>${lastSeen}</td>
       <td>${backupInfo}</td>

@@ -505,6 +505,10 @@
           <li><strong>Delete Site</strong> &mdash; removes it from the hub's list only. Doesn't touch the edge box itself, which can re-enroll later.</li>
         </ul>
         <p>The Status column shows <strong>Admins in sync</strong> or not, computed by comparing a cryptographic fingerprint of both sides' actual admin credentials (not just usernames) &mdash; so it only ever shows green when the accounts really do match.</p>
+        <div class="callout warn">
+          <span class="mark">Hub commands unverified</span>
+          <p>Every command the hub pushes to a site (queued updates, backup restore, admin sync, port/access/TFTP config) is signed with this hub's SSH host key and verified on the site's end against whatever fingerprint that site has pinned. A site that has never pinned this hub's fingerprint refuses every pushed command outright rather than trusting one unverified &mdash; and shows <strong>Hub commands unverified</strong> in the Status column as the only visible sign, since the site itself just logs and discards the command rather than erroring back to the hub. Fix it from that site's own Central Office panel: paste this hub's fingerprint (shown above) into <strong>Hub SSH host key</strong>.</p>
+        </div>
       </div>
       <div class="card">
         <h4>Bulk actions</h4>
