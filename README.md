@@ -200,3 +200,7 @@ button.
   itself runs under full software emulation regardless of host architecture (Docker
   Desktop doesn't expose HVF/KVM to a nested container), so it's markedly slower on
   Apple Silicon than a same-architecture build would be, but still just a few minutes.
+
+## License
+
+[MIT](LICENSE)

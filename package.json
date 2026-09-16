@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "dependencies": {
     "express": "^4.19.2",
     "express-session": "^1.18.0",
