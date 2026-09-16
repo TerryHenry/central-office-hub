@@ -195,6 +195,12 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    // Lazy-load the embedded Handbook only the first time its tab is opened, rather
+    // than fetching it on every page load whether or not anyone looks at it.
+    if (btn.dataset.tab === 'help') {
+      const frame = document.getElementById('handbookFrame');
+      if (!frame.src) frame.src = '/HANDBOOK.html';
+    }
   });
 });
 
