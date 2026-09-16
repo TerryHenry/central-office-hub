@@ -16,7 +16,7 @@ logStore.init(configStore.DATA_DIR);
 const hostKey = ensureHostKey(configStore.DATA_DIR);
 const tlsCertPair = ensureTlsCert(configStore.DATA_DIR);
 
-const { app, attachTerminalSocket } = createWebServer(tunnelServer, tftpServer, hostKey.publicKey);
+const { app, attachTerminalSocket } = createWebServer(tunnelServer, tftpServer, hostKey.publicKey, hostKey.privateKey);
 
 const webPort = configStore.getConfig().web.port;
 const httpsServer = https.createServer({ key: tlsCertPair.key, cert: tlsCertPair.cert }, app);
