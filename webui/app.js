@@ -458,8 +458,15 @@ async function loadSites() {
   const sites = await api.get('/api/sites');
   renderTopology(sites);
   const tbody = document.querySelector('#sitesTable tbody');
+  // This re-renders on every SSE 'sites' broadcast -- which fires on essentially every
+  // site's heartbeat, every few seconds with more than one site enrolled -- so a
+  // mid-heartbeat rebuild used to silently wipe out whatever the admin had just checked
+  // for a bulk action. Capture the checked set first and restore it below, rather than
+  // resetting selection on every routine background refresh.
+  const previouslyChecked = new Set(
+    [...tbody.querySelectorAll('.site-select:checked')].map((cb) => cb.dataset.site)
+  );
   tbody.innerHTML = '';
-  document.getElementById('sitesSelectAll').checked = false;
   for (const site of sites) {
     const tr = document.createElement('tr');
     const portsList = site.ports.length
@@ -483,7 +490,7 @@ async function loadSites() {
       versionInfo += '<br><span class="pill ok"><span class="dot"></span>Up to date</span>';
     }
     tr.innerHTML = `
-      <td><input type="checkbox" class="site-select" data-site="${site.id}" /></td>
+      <td><input type="checkbox" class="site-select" data-site="${site.id}" ${previouslyChecked.has(site.id) ? 'checked' : ''} /></td>
       <td>${escapeHtml(site.name)}</td>
       <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}</td>
       <td>${versionInfo}</td>
@@ -494,6 +501,7 @@ async function loadSites() {
     `;
     const actionsCell = tr.lastElementChild;
     const menuItems = [
+      { label: 'Rename', onClick: () => openSiteRenameModal(site) },
       {
         label: 'Upgrade Version',
         onClick: async () => {
@@ -521,6 +529,8 @@ async function loadSites() {
           }
         }
       });
+      menuItems.push({ label: 'View Site Info', onClick: () => openSiteInfoModal(site) });
+      menuItems.push({ label: 'Upload to TFTP', onClick: () => openSiteTftpUploadModal([site]) });
     }
     if (site.lastBackup) {
       menuItems.push({
@@ -531,6 +541,10 @@ async function loadSites() {
       });
     }
     menuItems.push({ label: 'Restore Backup', onClick: () => openSiteRestoreModal(site) });
+    menuItems.push('divider');
+    menuItems.push({ label: 'Configure Ports', onClick: () => openSitePortsModal(site) });
+    menuItems.push({ label: 'Local Access', onClick: () => openSiteLocalAccessModal(site) });
+    menuItems.push({ label: 'TFTP Server', onClick: () => openSiteTftpSettingsModal(site) });
     menuItems.push('divider');
     menuItems.push({
       label: 'Sync Admins',
@@ -554,6 +568,8 @@ async function loadSites() {
     actionsCell.appendChild(buildRowMenu(menuItems));
     tbody.appendChild(tr);
   }
+  const rowCheckboxes = [...tbody.querySelectorAll('.site-select')];
+  document.getElementById('sitesSelectAll').checked = rowCheckboxes.length > 0 && rowCheckboxes.every((cb) => cb.checked);
 }
 
 document.getElementById('sitesSelectAll').addEventListener('change', (e) => {
@@ -586,6 +602,42 @@ document.getElementById('bulkSyncAdminsBtn').addEventListener('click', async () 
   if (!confirm(`Replace every local admin account on ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} with this hub's own admin accounts? Any admin login not from the hub will stop working on those boxes. Each applies on its own next heartbeat.`)) return;
   const result = await api.post('/api/sites/sync-admins/bulk', { siteIds });
   alert(`Queued an admin sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+});
+
+document.getElementById('bulkTftpUploadBtn').addEventListener('click', () => {
+  const siteIds = Array.from(document.querySelectorAll('#sitesTable .site-select:checked')).map((cb) => cb.dataset.site);
+  if (siteIds.length === 0) {
+    alert('Select at least one site first.');
+    return;
+  }
+  const sites = lastTopologySites.filter((s) => siteIds.includes(s.id));
+  openSiteTftpUploadModal(sites);
+});
+
+function openSiteRenameModal(site) {
+  document.getElementById('siteRenameSiteId').value = site.id;
+  document.getElementById('siteRenameName').value = site.name;
+  clearFieldError('siteRenameName');
+  document.getElementById('siteRenameModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSiteRenameBtn').addEventListener('click', () => {
+  document.getElementById('siteRenameModalBackdrop').classList.remove('open');
+});
+document.getElementById('siteRenameName').addEventListener('input', () => clearFieldError('siteRenameName'));
+document.getElementById('saveSiteRenameBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteRenameSiteId').value;
+  const name = document.getElementById('siteRenameName').value.trim();
+  if (!name) {
+    setFieldError('siteRenameName', 'A site name is required.');
+    return;
+  }
+  try {
+    await api.post(`/api/sites/${siteId}/rename`, { name });
+    document.getElementById('siteRenameModalBackdrop').classList.remove('open');
+    await loadSites();
+  } catch (err) {
+    setFieldError('siteRenameName', err.message);
+  }
 });
 
 function openSiteRestoreModal(site) {
@@ -636,6 +688,278 @@ document.getElementById('saveSiteRestoreBtn').addEventListener('click', async ()
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
     alert('Restore queued -- it applies on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Configure ports (hub-pushed, applied on the site's next heartbeat) ----------
+const ACCESS_OPTIONS = [
+  ['exclusive', 'Exclusive'],
+  ['shared-rw', 'Shared (read/write)'],
+  ['first-write', 'Shared (first user read/write)'],
+  ['shared-ro', 'Shared (read-only)']
+];
+
+function addSitePortRow(port) {
+  const tbody = document.querySelector('#sitePortsTable tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="site-port-label" value="${escapeHtml(port?.label || '')}" placeholder="e.g. Router Console" /></td>
+    <td><input type="text" class="site-port-path" value="${escapeHtml(port?.path || '')}" placeholder="/dev/ttyUSB0" /></td>
+    <td><input type="number" class="site-port-baud" value="${port?.baudRate || 9600}" style="width: 5.5em" /></td>
+    <td><select class="site-port-access">${ACCESS_OPTIONS.map(([v, l]) => `<option value="${v}" ${port?.access === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+    <td><input type="checkbox" class="site-port-capture" ${port?.captureEnabled ? 'checked' : ''} /></td>
+    <td><button class="secondary remove-port-row-btn">Remove</button></td>
+  `;
+  tr.dataset.portId = port?.id || '';
+  tr.querySelector('.remove-port-row-btn').addEventListener('click', () => tr.remove());
+  tbody.appendChild(tr);
+}
+
+function openSitePortsModal(site) {
+  document.getElementById('sitePortsSiteId').value = site.id;
+  document.getElementById('sitePortsSiteName').textContent = site.name;
+  document.getElementById('sitePortsError').textContent = '';
+  document.getElementById('sitePortsScanResults').innerHTML = '';
+  const tbody = document.querySelector('#sitePortsTable tbody');
+  tbody.innerHTML = '';
+  for (const port of site.ports) addSitePortRow(port);
+  document.getElementById('sitePortsModalBackdrop').classList.add('open');
+}
+document.getElementById('addSitePortRowBtn').addEventListener('click', () => addSitePortRow(null));
+
+// Live request/response through the tunnel (GET /api/sites/:id/devices), not a queued
+// command -- see siteRegistry.requestDeviceList/tunnelClient's "listDevices" handshake.
+// Lets an admin pick a real device path instead of typing one blind.
+document.getElementById('scanSiteDevicesBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('sitePortsSiteId').value;
+  const resultsEl = document.getElementById('sitePortsScanResults');
+  const errEl = document.getElementById('sitePortsError');
+  errEl.textContent = '';
+  resultsEl.innerHTML = '<p class="hint">Scanning the site for available devices&hellip;</p>';
+  try {
+    const { ports } = await api.get(`/api/sites/${siteId}/devices`);
+    if (!ports.length) {
+      resultsEl.innerHTML = '<p class="hint">No devices found on that site.</p>';
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'check-list';
+    for (const dev of ports) {
+      const detail = [dev.manufacturer, dev.serialNumber].filter(Boolean).join(' · ');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:8px;';
+      row.innerHTML = `
+        <span><code>${escapeHtml(dev.path)}</code>${detail ? ` <span class="hint">${escapeHtml(detail)}</span>` : ''}</span>
+        <button class="secondary add-scanned-device-btn">+ Add</button>
+      `;
+      row.querySelector('.add-scanned-device-btn').addEventListener('click', () => {
+        addSitePortRow({ label: dev.manufacturer || dev.path, path: dev.path, baudRate: 9600, access: 'exclusive', captureEnabled: false });
+      });
+      list.appendChild(row);
+    }
+    resultsEl.innerHTML = '';
+    resultsEl.appendChild(list);
+  } catch (err) {
+    resultsEl.innerHTML = '';
+    errEl.textContent = err.message;
+  }
+});
+document.getElementById('cancelSitePortsBtn').addEventListener('click', () => {
+  document.getElementById('sitePortsModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSitePortsBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('sitePortsSiteId').value;
+  const errEl = document.getElementById('sitePortsError');
+  const rows = document.querySelectorAll('#sitePortsTable tbody tr');
+  const ports = [];
+  for (const row of rows) {
+    const label = row.querySelector('.site-port-label').value.trim();
+    const path = row.querySelector('.site-port-path').value.trim();
+    if (!label || !path) {
+      errEl.textContent = 'Every port needs a label and a device path.';
+      return;
+    }
+    ports.push({
+      id: row.dataset.portId || undefined,
+      label,
+      path,
+      baudRate: Number(row.querySelector('.site-port-baud').value) || 9600,
+      access: row.querySelector('.site-port-access').value,
+      captureEnabled: row.querySelector('.site-port-capture').checked
+    });
+  }
+  if (!confirm(`Queue this port configuration for this site? It replaces the site's entire port list on its next heartbeat.`)) return;
+  try {
+    await api.post(`/api/sites/${siteId}/ports`, { ports });
+    document.getElementById('sitePortsModalBackdrop').classList.remove('open');
+    alert('Port configuration queued -- it applies on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Local access (hub-pushed, applied on the site's next heartbeat) ----------
+function openSiteLocalAccessModal(site) {
+  document.getElementById('siteLocalAccessSiteId').value = site.id;
+  document.getElementById('siteLocalAccessSiteName').textContent = site.name;
+  document.getElementById('siteLocalAccessError').textContent = '';
+  document.getElementById('siteLocalAccessSsh').checked = site.edgeSshEnabled !== false;
+  document.getElementById('siteLocalAccessWeb').checked = site.edgeWebTerminalEnabled === true;
+  document.getElementById('siteLocalAccessModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSiteLocalAccessBtn').addEventListener('click', () => {
+  document.getElementById('siteLocalAccessModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSiteLocalAccessBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteLocalAccessSiteId').value;
+  const errEl = document.getElementById('siteLocalAccessError');
+  const sshEnabled = document.getElementById('siteLocalAccessSsh').checked;
+  const webTerminalEnabled = document.getElementById('siteLocalAccessWeb').checked;
+  try {
+    await api.post(`/api/sites/${siteId}/local-access`, { sshEnabled, webTerminalEnabled });
+    document.getElementById('siteLocalAccessModalBackdrop').classList.remove('open');
+    alert('Local access change queued -- it applies on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Site TFTP server (hub-pushed, applied on the site's next heartbeat) ----------
+function openSiteTftpSettingsModal(site) {
+  const reported = site.reportedTftp || {};
+  document.getElementById('siteTftpSettingsSiteId').value = site.id;
+  document.getElementById('siteTftpSettingsSiteName').textContent = site.name;
+  document.getElementById('siteTftpSettingsError').textContent = '';
+  document.getElementById('siteTftpSettingsEnabled').checked = reported.running === true;
+  document.getElementById('siteTftpSettingsPort').value = reported.port || 69;
+  document.getElementById('siteTftpSettingsAllowUpload').checked = reported.allowUpload !== false;
+  document.getElementById('siteTftpSettingsAutoStart').checked = reported.autoStart === true;
+  document.getElementById('siteTftpSettingsModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSiteTftpSettingsBtn').addEventListener('click', () => {
+  document.getElementById('siteTftpSettingsModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSiteTftpSettingsBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteTftpSettingsSiteId').value;
+  const errEl = document.getElementById('siteTftpSettingsError');
+  const enabled = document.getElementById('siteTftpSettingsEnabled').checked;
+  const port = Number(document.getElementById('siteTftpSettingsPort').value);
+  const allowUpload = document.getElementById('siteTftpSettingsAllowUpload').checked;
+  const autoStart = document.getElementById('siteTftpSettingsAutoStart').checked;
+  try {
+    await api.post(`/api/sites/${siteId}/tftp-settings`, { enabled, port, allowUpload, autoStart });
+    document.getElementById('siteTftpSettingsModalBackdrop').classList.remove('open');
+    alert('TFTP server settings queued -- they apply on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Site info (live, over the tunnel) ----------
+async function openSiteInfoModal(site) {
+  document.getElementById('siteInfoSiteName').textContent = site.name;
+  document.getElementById('siteInfoTable').hidden = true;
+  document.getElementById('refreshSiteInfoBtn').hidden = true;
+  document.getElementById('siteInfoError').textContent = '';
+  const loadingEl = document.getElementById('siteInfoLoading');
+  loadingEl.hidden = false;
+  loadingEl.textContent = 'Fetching a live snapshot from the site…';
+  document.getElementById('siteInfoModalBackdrop').classList.add('open');
+
+  try {
+    const info = await api.get(`/api/sites/${site.id}/info`);
+    loadingEl.hidden = true;
+    const ips = (info.interfaces || []).filter((i) => i.ip).map((i) => `${i.ip} (${i.name})`);
+    document.getElementById('siteInfoHostname').textContent = info.hostname || '—';
+    document.getElementById('siteInfoMdns').textContent = info.mdnsName || '—';
+    document.getElementById('siteInfoIps').innerHTML = ips.length ? ips.map(escapeHtml).join('<br>') : '<span class="hint">none reported</span>';
+    document.getElementById('siteInfoPublicIp').textContent = info.publicIp || '—';
+    document.getElementById('siteInfoClients').textContent = info.clientsConnected != null ? info.clientsConnected : '—';
+    document.getElementById('siteInfoOs').textContent = info.osRelease || '—';
+    document.getElementById('siteInfoKernel').textContent = info.kernel || '—';
+    document.getElementById('siteInfoArch').textContent = info.arch || '—';
+    document.getElementById('siteInfoCpu').textContent = info.cpuModel
+      ? `${info.cpuModel} (${info.cpuCores} core${info.cpuCores === 1 ? '' : 's'})${info.cpuPercent != null ? ` — ${info.cpuPercent}% used` : ''}`
+      : '—';
+    document.getElementById('siteInfoMemory').textContent = info.memory
+      ? `${formatBytes(info.memory.used)} / ${formatBytes(info.memory.total)} (${info.memory.percent}%)`
+      : '—';
+    document.getElementById('siteInfoDisk').textContent = info.disk
+      ? `${formatBytes(info.disk.used)} / ${formatBytes(info.disk.total)} (${info.disk.percent}%)${info.disk.mount ? ` on ${info.disk.mount}` : ''}`
+      : '<span class="hint">unavailable</span>';
+    document.getElementById('siteInfoUptime').textContent = info.uptimeSec != null ? formatUptime(info.uptimeSec) : '—';
+    document.getElementById('siteInfoNode').textContent = info.nodeVersion || '—';
+    document.getElementById('siteInfoAppVersion').textContent = info.appVersion || '—';
+    document.getElementById('siteInfoTable').hidden = false;
+    document.getElementById('refreshSiteInfoBtn').hidden = false;
+  } catch (err) {
+    loadingEl.hidden = true;
+    document.getElementById('siteInfoError').textContent = err.message;
+    document.getElementById('refreshSiteInfoBtn').hidden = false;
+  }
+  document.getElementById('refreshSiteInfoBtn').onclick = () => openSiteInfoModal(site);
+}
+document.getElementById('closeSiteInfoBtn').addEventListener('click', () => {
+  document.getElementById('siteInfoModalBackdrop').classList.remove('open');
+});
+
+// ---------- Upload to TFTP (live, over the tunnel; one or many sites) ----------
+function openSiteTftpUploadModal(sites) {
+  document.getElementById('siteTftpUploadFile').value = '';
+  document.getElementById('siteTftpUploadError').textContent = '';
+  document.getElementById('siteTftpUploadResults').innerHTML = '';
+  const targetsEl = document.getElementById('siteTftpUploadTargets');
+  targetsEl.innerHTML = '';
+  targetsEl.dataset.siteIds = JSON.stringify(sites.map((s) => s.id));
+  for (const site of sites) {
+    const row = document.createElement('div');
+    row.textContent = site.name + (site.connected ? '' : ' (offline)');
+    if (!site.connected) row.classList.add('hint');
+    targetsEl.appendChild(row);
+  }
+  document.getElementById('saveSiteTftpUploadBtn').hidden = false;
+  document.getElementById('cancelSiteTftpUploadBtn').textContent = 'Cancel';
+  document.getElementById('siteTftpUploadModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSiteTftpUploadBtn').addEventListener('click', () => {
+  document.getElementById('siteTftpUploadModalBackdrop').classList.remove('open');
+});
+document.getElementById('saveSiteTftpUploadBtn').addEventListener('click', async () => {
+  const errEl = document.getElementById('siteTftpUploadError');
+  const resultsEl = document.getElementById('siteTftpUploadResults');
+  errEl.textContent = '';
+  resultsEl.innerHTML = '';
+  const fileInput = document.getElementById('siteTftpUploadFile');
+  const file = fileInput.files[0];
+  if (!file) {
+    errEl.textContent = 'Choose a file first.';
+    return;
+  }
+  const siteIds = JSON.parse(document.getElementById('siteTftpUploadTargets').dataset.siteIds || '[]');
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    if (siteIds.length === 1) {
+      const res = await fetch(`/api/sites/${siteIds[0]}/tftp-upload`, { method: 'POST', body: formData });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      resultsEl.innerHTML = `<p class="hint">Uploaded "${escapeHtml(body.filename)}" (${formatBytes(body.bytesWritten)}).</p>`;
+    } else {
+      formData.append('siteIds', JSON.stringify(siteIds));
+      const res = await fetch('/api/sites/tftp-upload/bulk', { method: 'POST', body: formData });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      resultsEl.innerHTML = body.results
+        .map((r) => `<p class="hint">${r.ok ? '✓' : '✗'} ${escapeHtml(r.name || r.siteId)}${r.ok ? '' : ` — ${escapeHtml(r.error)}`}</p>`)
+        .join('');
+    }
+    // Done -- swap "Upload"/"Cancel" for a single "OK" so the result stays on screen
+    // until the admin dismisses it, instead of implying there's still something to
+    // upload or cancel.
+    document.getElementById('saveSiteTftpUploadBtn').hidden = true;
+    document.getElementById('cancelSiteTftpUploadBtn').textContent = 'OK';
   } catch (err) {
     errEl.textContent = err.message;
   }
@@ -1056,6 +1380,115 @@ async function loadMyUsername() {
   document.getElementById('myUsername').textContent = session.username || '—';
 }
 
+// ---------- Admin accounts (multiple hub admins, same shape as the appliance's own) ----------
+function formatLastLogin(iso) {
+  return iso ? new Date(iso).toLocaleString() : '<span class="hint">Never</span>';
+}
+
+async function loadAdminsTable() {
+  const admins = await api.get('/api/admins');
+  admins.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: 'base' }));
+  const tbody = document.querySelector('#adminsTable tbody');
+  tbody.innerHTML = '';
+  for (const a of admins) {
+    const tr = document.createElement('tr');
+    const statusPillHtml = a.mustChangePassword
+      ? '<span class="pill mute"><span class="dot"></span>Must change password</span>'
+      : '<span class="pill ok"><span class="dot"></span>Active</span>';
+    const totpPill = a.totpEnabled
+      ? '<span class="pill ok"><span class="dot"></span>On</span>'
+      : '<span class="pill mute"><span class="dot"></span>Off</span>';
+    tr.innerHTML = `
+      <td>${escapeHtml(a.username)}${a.isSelf ? ' <span class="hint">(you)</span>' : ''}</td>
+      <td>${statusPillHtml}</td>
+      <td>${totpPill}</td>
+      <td>${formatLastLogin(a.lastLoginAt)}</td>
+      <td></td>
+    `;
+    const actionsCell = tr.lastElementChild;
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => openAdminModal(a));
+    actionsCell.appendChild(editBtn);
+    if (!a.isSelf) {
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.className = 'danger';
+      delBtn.style.marginLeft = '6px';
+      delBtn.addEventListener('click', async () => {
+        if (confirm(`Delete admin account "${a.username}"?`)) {
+          try {
+            await api.del(`/api/admins/${a.id}`);
+            await loadAdminsTable();
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      });
+      actionsCell.appendChild(delBtn);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+function openAdminModal(admin) {
+  document.getElementById('adminModalTitle').textContent = admin ? 'Edit Admin' : 'Add Admin';
+  document.getElementById('adminId').value = admin?.id || '';
+  document.getElementById('adminUsername').value = admin?.username || '';
+  document.getElementById('adminPassword').value = '';
+  document.getElementById('adminPasswordConfirm').value = '';
+  document.getElementById('adminPasswordHint').style.display = admin ? 'inline' : 'none';
+  clearFieldError('adminUsername');
+  clearFieldError('adminPassword');
+  document.getElementById('adminModalBackdrop').classList.add('open');
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModalBackdrop').classList.remove('open');
+}
+
+document.getElementById('addAdminBtn').addEventListener('click', () => openAdminModal(null));
+document.getElementById('cancelAdminBtn').addEventListener('click', closeAdminModal);
+document.getElementById('adminUsername').addEventListener('input', () => clearFieldError('adminUsername'));
+document.getElementById('adminPassword').addEventListener('input', () => clearFieldError('adminPassword'));
+
+document.getElementById('saveAdminBtn').addEventListener('click', async () => {
+  const id = document.getElementById('adminId').value;
+  const username = document.getElementById('adminUsername').value.trim();
+  const password = document.getElementById('adminPassword').value;
+  const confirmPassword = document.getElementById('adminPasswordConfirm').value;
+  let valid = true;
+  if (!username) {
+    setFieldError('adminUsername', 'Username is required.');
+    valid = false;
+  }
+  if (!id && !password) {
+    setFieldError('adminPassword', 'A password is required for a new admin.');
+    valid = false;
+  }
+  if (password && password.length < 8) {
+    setFieldError('adminPassword', 'Password must be at least 8 characters.');
+    valid = false;
+  }
+  if (password && password !== confirmPassword) {
+    setFieldError('adminPassword', 'Passwords do not match.');
+    valid = false;
+  }
+  if (!valid) return;
+  try {
+    if (id) {
+      await api.post(`/api/admins/${id}`, { username, password: password || undefined });
+    } else {
+      await api.post('/api/admins', { username, password });
+    }
+    closeAdminModal();
+    await loadAdminsTable();
+    await loadMyUsername();
+  } catch (err) {
+    setFieldError('adminUsername', err.message);
+  }
+});
+
 document.getElementById('changeAdminPasswordBtn').addEventListener('click', async () => {
   const msg = document.getElementById('adminPasswordMsg');
   msg.style.color = 'var(--danger)';
@@ -1433,6 +1866,10 @@ document.getElementById('rollbackUpdateBtn').addEventListener('click', () => {
 });
 
 // ---------- Backup / restore ----------
+document.getElementById('downloadLogBtn').addEventListener('click', () => {
+  window.location.href = '/api/log/download';
+});
+
 document.getElementById('downloadBackupBtn').addEventListener('click', () => {
   const includeHostKey = document.getElementById('includeHostKeyOnBackup').checked;
   window.location.href = `/api/backup${includeHostKey ? '?includeHostKey=1' : ''}`;
@@ -2115,6 +2552,7 @@ async function initApp() {
   await loadTftpSettings();
   await loadTftpFiles();
   await loadMyUsername();
+  await loadAdminsTable();
   await loadTotpStatus();
   await loadHostKeyFingerprint();
   await loadHaConfig();

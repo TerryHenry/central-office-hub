@@ -62,7 +62,8 @@
       <button class="tab-btn" data-tab="tftp">TFTP</button>
       <button class="tab-btn" data-tab="sessions">Sessions</button>
       <button class="tab-btn" data-tab="log">Log</button>
-      <button class="tab-btn" data-tab="account">Account</button>
+      <button class="tab-btn" data-tab="system">System</button>
+      <button class="tab-btn" data-tab="account">Admins</button>
       <button class="tab-btn" data-tab="about">About</button>
     </div>
 
@@ -143,6 +144,7 @@
           <button id="addSiteBtn">+ Add Site</button>
           <button id="bulkQueueUpdateBtn">Upgrade Version for Selected</button>
           <button id="bulkSyncAdminsBtn" class="danger">Sync Admins for Selected</button>
+          <button id="bulkTftpUploadBtn" class="secondary">Upload to TFTP for Selected</button>
           <button id="revealPortIdsBtn" class="secondary">Reveal Port IDs</button>
         </div>
       </div>
@@ -346,9 +348,14 @@
     <div class="tab-content" id="tab-log">
       <div class="panel">
         <h2>Server Log</h2>
+        <div class="field-row">
+          <button id="downloadLogBtn" class="secondary">Download Log</button>
+        </div>
         <pre class="code-block log-view" id="logView"></pre>
       </div>
+    </div>
 
+    <div class="tab-content" id="tab-system">
       <div class="panel">
         <h2>External Syslog Server</h2>
         <p class="hint">Mirrors audit log entries to an external syslog server (UDP, RFC 3164) as they happen.</p>
@@ -380,69 +387,6 @@
           <button id="testSyslogBtn" class="secondary">Send Test Message</button>
         </div>
         <div class="auth-error" id="syslogMsg"></div>
-      </div>
-    </div>
-
-    <div class="tab-content" id="tab-account">
-      <div class="panel">
-        <h2>My Account</h2>
-        <p class="hint">Signed in as <strong id="myUsername">&mdash;</strong>.</p>
-        <div class="field-row column">
-          <label for="newAdminPassword">New password <span class="hint" id="newAdminPasswordHint"></span></label>
-          <input type="password" id="newAdminPassword" minlength="8" />
-        </div>
-        <div class="field-row column">
-          <label for="newAdminPasswordConfirm">Confirm new password</label>
-          <input type="password" id="newAdminPasswordConfirm" minlength="8" />
-        </div>
-        <div class="field-row">
-          <button id="changeAdminPasswordBtn">Change Password</button>
-        </div>
-        <div class="auth-error" id="adminPasswordMsg"></div>
-      </div>
-
-      <div class="panel">
-        <h2>Two-Factor Authentication</h2>
-        <p class="hint">Adds a second step at login: a 6-digit code from an authenticator app (Google Authenticator, Authy, 1Password, etc.), on top of your password. Optional, off by default.</p>
-        <div class="field-row">
-          <span>Status</span>
-          <span class="status-pill" id="totpStatusPill">
-            <span class="dot"></span>
-            <span id="totpStatusText">Disabled</span>
-          </span>
-          <button id="enableTotpBtn" class="primary">Enable 2FA</button>
-          <button id="disableTotpBtn" class="danger" hidden>Disable 2FA</button>
-        </div>
-
-        <div id="totpSetupPanel" hidden>
-          <p class="hint">Scan this with your authenticator app, or enter the code manually.</p>
-          <div id="totpQrContainer"></div>
-          <div class="field-row column">
-            <label>Manual entry code</label>
-            <code id="totpSecretText"></code>
-          </div>
-          <div class="field-row column">
-            <label for="totpConfirmCode">Enter the 6-digit code to confirm</label>
-            <input type="text" id="totpConfirmCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
-          </div>
-          <div class="field-row">
-            <button id="confirmTotpBtn" class="primary">Confirm &amp; Enable</button>
-            <button id="cancelTotpSetupBtn" class="secondary">Cancel</button>
-          </div>
-        </div>
-
-        <div id="totpDisablePanel" hidden>
-          <div class="field-row column">
-            <label for="totpDisableCode">Enter your current 6-digit code to disable 2FA</label>
-            <input type="text" id="totpDisableCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
-          </div>
-          <div class="field-row">
-            <button id="confirmDisableTotpBtn" class="danger">Confirm Disable</button>
-            <button id="cancelTotpDisableBtn" class="secondary">Cancel</button>
-          </div>
-        </div>
-
-        <div class="auth-error" id="totpSetupMsg"></div>
       </div>
 
       <div class="panel">
@@ -631,6 +575,79 @@
       </div>
     </div>
 
+    <div class="tab-content" id="tab-account">
+      <div class="panel">
+        <h2>My Account</h2>
+        <p class="hint">Signed in as <strong id="myUsername">&mdash;</strong>.</p>
+        <div class="field-row column">
+          <label for="newAdminPassword">New password <span class="hint" id="newAdminPasswordHint"></span></label>
+          <input type="password" id="newAdminPassword" minlength="8" />
+        </div>
+        <div class="field-row column">
+          <label for="newAdminPasswordConfirm">Confirm new password</label>
+          <input type="password" id="newAdminPasswordConfirm" minlength="8" />
+        </div>
+        <div class="field-row">
+          <button id="changeAdminPasswordBtn">Change Password</button>
+        </div>
+        <div class="auth-error" id="adminPasswordMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Two-Factor Authentication</h2>
+        <p class="hint">Adds a second step at login: a 6-digit code from an authenticator app (Google Authenticator, Authy, 1Password, etc.), on top of your password. Optional, off by default.</p>
+        <div class="field-row">
+          <span>Status</span>
+          <span class="status-pill" id="totpStatusPill">
+            <span class="dot"></span>
+            <span id="totpStatusText">Disabled</span>
+          </span>
+          <button id="enableTotpBtn" class="primary">Enable 2FA</button>
+          <button id="disableTotpBtn" class="danger" hidden>Disable 2FA</button>
+        </div>
+
+        <div id="totpSetupPanel" hidden>
+          <p class="hint">Scan this with your authenticator app, or enter the code manually.</p>
+          <div id="totpQrContainer"></div>
+          <div class="field-row column">
+            <label>Manual entry code</label>
+            <code id="totpSecretText"></code>
+          </div>
+          <div class="field-row column">
+            <label for="totpConfirmCode">Enter the 6-digit code to confirm</label>
+            <input type="text" id="totpConfirmCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
+          </div>
+          <div class="field-row">
+            <button id="confirmTotpBtn" class="primary">Confirm &amp; Enable</button>
+            <button id="cancelTotpSetupBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div id="totpDisablePanel" hidden>
+          <div class="field-row column">
+            <label for="totpDisableCode">Enter your current 6-digit code to disable 2FA</label>
+            <input type="text" id="totpDisableCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" />
+          </div>
+          <div class="field-row">
+            <button id="confirmDisableTotpBtn" class="danger">Confirm Disable</button>
+            <button id="cancelTotpDisableBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div class="auth-error" id="totpSetupMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Admin Accounts</h2>
+        <p class="hint">Full control over this hub -- sites, users, groups, and hub settings. Separate from console users (Users tab) and from any site's own local admin login.</p>
+        <table class="data-table" id="adminsTable">
+          <thead><tr><th>Username</th><th>Status</th><th>2FA</th><th>Last Login</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addAdminBtn">+ Add Admin</button>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-about">
       <div class="panel about-panel">
         <img class="about-logo" src="assets/logo.png" alt="Serial Killer Terminal Server" />
@@ -800,6 +817,177 @@
       <div class="modal-actions">
         <button id="cancelGrantBtn" class="secondary">Cancel</button>
         <button id="saveGrantBtn" class="primary">Add Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configure ports modal -->
+  <div class="modal-backdrop" id="sitePortsModalBackdrop">
+    <div class="modal" style="width: 640px;">
+      <h3>Configure Ports for <span id="sitePortsSiteName"></span></h3>
+      <p class="hint">Queues a full port configuration for this site -- applied on its next heartbeat (managed mode, box must be online). This replaces its <em>entire</em> port list, so a port left out of this table on Save is removed from that site.</p>
+      <div class="table-wrap">
+        <table class="data-table" id="sitePortsTable">
+          <thead><tr><th>Label</th><th>Device Path</th><th>Baud</th><th>Access</th><th>Capture</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="field-row">
+        <button id="addSitePortRowBtn" class="secondary">+ Add Port</button>
+        <button id="scanSiteDevicesBtn" class="secondary">Scan Site for Devices</button>
+      </div>
+      <div id="sitePortsScanResults"></div>
+      <input type="hidden" id="sitePortsSiteId" />
+      <span class="field-error" id="sitePortsError"></span>
+      <div class="modal-actions">
+        <button id="cancelSitePortsBtn" class="secondary">Cancel</button>
+        <button id="saveSitePortsBtn" class="primary">Queue Port Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local access modal -->
+  <div class="modal-backdrop" id="siteLocalAccessModalBackdrop">
+    <div class="modal">
+      <h3>Local Access for <span id="siteLocalAccessSiteName"></span></h3>
+      <p class="hint">Queues a change to this site's own local SSH-to-serial and web console access -- applied on its next heartbeat. Turning both off routes every session through this hub instead, where this hub's own groups and audit log apply.</p>
+      <div class="field-row">
+        <label for="siteLocalAccessSsh">Local SSH-to-serial</label>
+        <input type="checkbox" id="siteLocalAccessSsh" />
+      </div>
+      <div class="field-row">
+        <label for="siteLocalAccessWeb">Local web console (HTTPS-to-serial)</label>
+        <input type="checkbox" id="siteLocalAccessWeb" />
+      </div>
+      <input type="hidden" id="siteLocalAccessSiteId" />
+      <span class="field-error" id="siteLocalAccessError"></span>
+      <div class="modal-actions">
+        <button id="cancelSiteLocalAccessBtn" class="secondary">Cancel</button>
+        <button id="saveSiteLocalAccessBtn" class="primary">Queue Change</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site TFTP server modal -->
+  <div class="modal-backdrop" id="siteTftpSettingsModalBackdrop">
+    <div class="modal">
+      <h3>TFTP Server for <span id="siteTftpSettingsSiteName"></span></h3>
+      <p class="hint">Queues a change to this site's own TFTP server -- applied on its next heartbeat. Changing the port while running restarts it there.</p>
+      <div class="field-row">
+        <label for="siteTftpSettingsEnabled">Server running</label>
+        <input type="checkbox" id="siteTftpSettingsEnabled" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsPort">Listen port</label>
+        <input type="number" id="siteTftpSettingsPort" min="1" max="65535" style="width: 6em" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsAllowUpload">Allow uploads</label>
+        <input type="checkbox" id="siteTftpSettingsAllowUpload" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsAutoStart">Start automatically on boot</label>
+        <input type="checkbox" id="siteTftpSettingsAutoStart" />
+      </div>
+      <input type="hidden" id="siteTftpSettingsSiteId" />
+      <span class="field-error" id="siteTftpSettingsError"></span>
+      <div class="modal-actions">
+        <button id="cancelSiteTftpSettingsBtn" class="secondary">Cancel</button>
+        <button id="saveSiteTftpSettingsBtn" class="primary">Queue Change</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/edit admin modal -->
+  <div class="modal-backdrop" id="adminModalBackdrop">
+    <div class="modal">
+      <h3 id="adminModalTitle">Add Admin</h3>
+      <div class="field-row column">
+        <label for="adminUsername">Username</label>
+        <input type="text" id="adminUsername" />
+        <span class="field-error" id="adminUsernameError"></span>
+      </div>
+      <div class="field-row column">
+        <label for="adminPassword">Password <span class="hint" id="adminPasswordHint">(leave blank to keep existing)</span></label>
+        <input type="password" id="adminPassword" minlength="8" />
+        <label for="adminPasswordConfirm">Confirm password</label>
+        <input type="password" id="adminPasswordConfirm" minlength="8" />
+        <span class="field-error" id="adminPasswordError"></span>
+      </div>
+      <input type="hidden" id="adminId" />
+      <div class="modal-actions">
+        <button id="cancelAdminBtn" class="secondary">Cancel</button>
+        <button id="saveAdminBtn" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site info modal -->
+  <div class="modal-backdrop" id="siteInfoModalBackdrop">
+    <div class="modal" style="width: 560px;">
+      <h3>Site Info for <span id="siteInfoSiteName"></span></h3>
+      <p class="hint" id="siteInfoLoading">Fetching a live snapshot from the site&hellip;</p>
+      <span class="field-error" id="siteInfoError"></span>
+      <table class="data-table" id="siteInfoTable" hidden>
+        <tbody>
+          <tr><th>Hostname</th><td id="siteInfoHostname">&mdash;</td></tr>
+          <tr><th>mDNS name</th><td id="siteInfoMdns">&mdash;</td></tr>
+          <tr><th>IP addresses</th><td id="siteInfoIps">&mdash;</td></tr>
+          <tr><th>Public IP</th><td id="siteInfoPublicIp">&mdash;</td></tr>
+          <tr><th>Connected clients</th><td id="siteInfoClients">&mdash;</td></tr>
+          <tr><th>Operating System</th><td id="siteInfoOs">&mdash;</td></tr>
+          <tr><th>Kernel</th><td id="siteInfoKernel">&mdash;</td></tr>
+          <tr><th>Architecture</th><td id="siteInfoArch">&mdash;</td></tr>
+          <tr><th>CPU</th><td id="siteInfoCpu">&mdash;</td></tr>
+          <tr><th>Memory</th><td id="siteInfoMemory">&mdash;</td></tr>
+          <tr><th>Disk</th><td id="siteInfoDisk">&mdash;</td></tr>
+          <tr><th>Uptime</th><td id="siteInfoUptime">&mdash;</td></tr>
+          <tr><th>Node.js</th><td id="siteInfoNode">&mdash;</td></tr>
+          <tr><th>App Version</th><td id="siteInfoAppVersion">&mdash;</td></tr>
+        </tbody>
+      </table>
+      <div class="modal-actions">
+        <button id="refreshSiteInfoBtn" class="secondary" hidden>Refresh</button>
+        <button id="closeSiteInfoBtn" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload to TFTP modal -->
+  <div class="modal-backdrop" id="siteTftpUploadModalBackdrop">
+    <div class="modal">
+      <h3>Upload to TFTP Directory</h3>
+      <p class="hint">Sends a file straight to the TFTP root directory on each target site below, over its existing encrypted tunnel -- the site must be online. Overwrites a file already there with the same name.</p>
+      <div class="field-row column">
+        <label>Target site(s)</label>
+        <div id="siteTftpUploadTargets" class="check-list" style="max-height: 140px;"></div>
+      </div>
+      <div class="field-row column">
+        <label for="siteTftpUploadFile">File</label>
+        <input type="file" id="siteTftpUploadFile" />
+      </div>
+      <span class="field-error" id="siteTftpUploadError"></span>
+      <div id="siteTftpUploadResults"></div>
+      <div class="modal-actions">
+        <button id="cancelSiteTftpUploadBtn" class="secondary">Cancel</button>
+        <button id="saveSiteTftpUploadBtn" class="primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename site modal -->
+  <div class="modal-backdrop" id="siteRenameModalBackdrop">
+    <div class="modal">
+      <h3>Rename Site</h3>
+      <div class="field-row column">
+        <label for="siteRenameName">Site name</label>
+        <input type="text" id="siteRenameName" />
+        <span class="field-error" id="siteRenameError"></span>
+      </div>
+      <input type="hidden" id="siteRenameSiteId" />
+      <div class="modal-actions">
+        <button id="cancelSiteRenameBtn" class="secondary">Cancel</button>
+        <button id="saveSiteRenameBtn" class="primary">Save</button>
       </div>
     </div>
   </div>
