@@ -24,7 +24,14 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   the box's own next heartbeat, using its own existing self-update pipeline.
 - **Host-key pinning** -- an edge box can pin this hub's SSH host key, closing a
   man-in-the-middle gap on the tunnel connection.
-- **Optional TOTP** -- two-factor auth for hub admin accounts, off by default.
+- **Optional TOTP** -- two-factor auth for hub admin accounts, off by default. Multiple
+  admin accounts are supported, same as the appliance's own admin-account system.
+- **Live device scan, site info, and TFTP push** -- request/response queries over a
+  connected site's existing tunnel (not the heartbeat poll): enumerate its available
+  serial devices, pull a live hostname/IP/CPU/memory snapshot, or push a file straight
+  into its TFTP directory, singly or across several sites at once.
+- **Remote port and TFTP-server configuration** -- add/edit/remove a site's serial ports,
+  or start/stop/configure its TFTP server, queued and applied on its next heartbeat.
 
 ## Quick start (development)
 

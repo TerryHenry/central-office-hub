@@ -411,8 +411,10 @@
       <li><a href="#tab-groups">Groups</a></li>
       <li><a href="#tab-network">Network</a></li>
       <li><a href="#tab-tftp">TFTP</a></li>
-      <li><a href="#tab-sessions">Sessions &amp; Log</a></li>
-      <li><a href="#tab-account">Account</a></li>
+      <li><a href="#tab-sessions">Sessions</a></li>
+      <li><a href="#tab-log">Log</a></li>
+      <li><a href="#tab-system">System</a></li>
+      <li><a href="#tab-account">Admins</a></li>
       <li><a href="#tab-about">About</a></li>
     </ul>
     <div class="group-label">Reference</div>
@@ -437,7 +439,7 @@
       <p>Visit <code>https://&lt;hub-host&gt;:8443</code> (accept the self-signed certificate warning on a fresh install) and sign in with <code>admin</code> / <code>letmein0!</code>. You'll be required to set a new password immediately, enforced by the server itself &mdash; there's no way to skip it.</p>
       <div class="callout tip">
         <span class="mark">Optional 2FA</span>
-        <p>Turn on two-factor authentication for this account any time from <a href="#tab-account">Account &rarr; Two-Factor Authentication</a>. Off by default.</p>
+        <p>Turn on two-factor authentication for this account any time from <a href="#tab-account">Admins &rarr; Two-Factor Authentication</a>. Off by default.</p>
       </div>
     </section>
 
@@ -446,7 +448,7 @@
       <div class="tab-grid">
         <div class="card">
           <h4>Hub admin accounts</h4>
-          <p>Full control over this hub &mdash; sites, users, groups, and hub settings. Managed in <a href="#tab-account">Account</a>. Unrelated to any site's own admin login.</p>
+          <p>Full control over this hub &mdash; sites, users, groups, and hub settings. This hub supports more than one admin account; managed in <a href="#tab-account">Admins</a>. Unrelated to any site's own admin login.</p>
         </div>
         <div class="card">
           <h4>Console users</h4>
@@ -490,9 +492,15 @@
         <h4>Per-site actions</h4>
         <p>The <strong>&#8942;</strong> menu on each row keeps the table uncluttered:</p>
         <ul>
+          <li><strong>Rename</strong> &mdash; changes only this site's label on the hub; doesn't touch anything on the edge box itself.</li>
           <li><strong>Upgrade Version</strong> / <strong>Request Backup</strong> &mdash; queued, applied on the site's next heartbeat, not instantly.</li>
           <li><strong>Open Admin UI</strong> &mdash; opens that site's own HTTPS admin UI in a new tab, tunneled through the same encrypted connection as its console traffic. Only shown while the site is connected. The tunnel itself never terminates or inspects the TLS inside it &mdash; it's a raw byte pipe straight to the site's own web server.</li>
+          <li><strong>View Site Info</strong> &mdash; a live snapshot fetched on click (not carried on every heartbeat): hostname, mDNS name, network interfaces, public IP, connected clients, CPU/memory/disk, uptime, and versions. Only shown while the site is connected.</li>
           <li><strong>Download Backup</strong> / <strong>Restore Backup</strong> &mdash; work with whatever config backup that site last sent (or push one from a local file).</li>
+          <li><strong>Configure Ports</strong> &mdash; add, edit, or remove this site's serial ports from here, including a <strong>Scan Site for Devices</strong> button that asks the site (live, over its tunnel) for its actual available device paths, instead of typing one blind. Saving replaces the site's <em>entire</em> port list on its next heartbeat.</li>
+          <li><strong>Local Access</strong> &mdash; turn this site's own local SSH-to-serial and web console on or off, applied on its next heartbeat.</li>
+          <li><strong>TFTP Server</strong> &mdash; start or stop this site's own TFTP server and change its port, upload permission, and auto-start setting, applied on its next heartbeat.</li>
+          <li><strong>Upload to TFTP</strong> &mdash; pushes a file straight into this site's TFTP root directory, live, over its tunnel.</li>
           <li><strong>Sync Admins</strong> &mdash; replaces <em>every</em> local admin account on that site with this hub's own admin account list. Confirms before running, since it's a hard replace, not a merge.</li>
           <li><strong>Delete Site</strong> &mdash; removes it from the hub's list only. Doesn't touch the edge box itself, which can re-enroll later.</li>
         </ul>
@@ -500,7 +508,7 @@
       </div>
       <div class="card">
         <h4>Bulk actions</h4>
-        <p>Select multiple sites with the row checkboxes to <strong>Upgrade Version for Selected</strong> or <strong>Sync Admins for Selected</strong> in one go, instead of one at a time.</p>
+        <p>Select multiple sites with the row checkboxes to <strong>Upgrade Version for Selected</strong>, <strong>Sync Admins for Selected</strong>, or <strong>Upload to TFTP for Selected</strong> in one go, instead of one at a time &mdash; the TFTP push reports success or failure per site, so one being offline doesn't block the rest.</p>
       </div>
     </section>
 
@@ -559,45 +567,40 @@
       <div class="card">
         <p>Off by default. Useful for pushing firmware or config files to network devices reachable from the hub host itself &mdash; separate from any TFTP server a site might run on its own network. The standard port (69) needs no extra privileges here; the service is granted that capability directly, the same way the appliance is.</p>
       </div>
+      <div class="callout tip">
+        <span class="mark">Pushing to a site instead</span>
+        <p>This tab is the hub's <em>own</em> TFTP server. To push a file into a <em>site's</em> TFTP directory, or to start/stop/configure a site's own TFTP server, use that site's row menu on the <a href="#tab-sites">Sites</a> tab instead.</p>
+      </div>
     </section>
 
     <section id="tab-sessions">
-      <h3 id="tab-sessions-inner">Sessions &amp; Log</h3>
-      <div class="tab-grid">
-        <div class="card">
-          <h4>Active Sessions</h4>
-          <p>Every SSH and web console session currently open through this hub, across every site, with live <strong>Traffic (RX / TX)</strong> byte counters and how long each has been connected. <strong>Disconnect</strong> ends one immediately.</p>
-        </div>
-        <div class="card">
-          <h4>Log</h4>
-          <p>A live stream of connect/disconnect events and hub activity. Admin actions are tagged <code>[AUDIT]</code> right in this same stream.</p>
-        </div>
+      <h3 id="tab-sessions-inner">Sessions</h3>
+      <div class="card">
+        <h4>Active Sessions</h4>
+        <p>Every SSH and web console session currently open through this hub, across every site, with live <strong>Traffic (RX / TX)</strong> byte counters and how long each has been connected. <strong>Disconnect</strong> ends one immediately.</p>
       </div>
       <div class="card">
         <h4>Session Captures</h4>
         <p>Byte-for-byte logs of past sessions for users with <strong>Capture</strong> turned on (Users tab) &mdash; one file per session, listed with size and last-modified time. Click a filename to download it; <strong>Delete</strong> removes it permanently.</p>
       </div>
+    </section>
+
+    <section id="tab-log">
+      <h3 id="tab-log-inner">Log</h3>
       <div class="card">
-        <h4>External Syslog Server</h4>
-        <p>Mirrors every <code>[AUDIT]</code> entry to an external syslog server in real time, over UDP using the standard BSD (RFC&nbsp;3164) format. Off by default. Fill in the server's host and port (<code>514</code> is the usual default) and a facility, then <strong>Save Settings</strong>; <strong>Send Test Message</strong> confirms it's reaching the collector without waiting for a real event. Packets from this hub are tagged <code>central-office:</code>, distinct from the <code>terminalserver:</code> tag a site's own syslog forwarding uses &mdash; so a shared collector can tell the two apart.</p>
+        <p>A live stream of connect/disconnect events and hub activity. Admin actions are tagged <code>[AUDIT]</code> right in this same stream. <strong>Download Log</strong>, at the top of the panel, saves the currently-kept history (the last 2,000 lines) as a plain-text file.</p>
       </div>
     </section>
 
-    <section id="tab-account">
-      <h3 id="tab-account-inner">Account</h3>
-      <div class="tab-grid">
-        <div class="card">
-          <h4>My Account</h4>
-          <p>Change your own hub admin password, and turn on <strong>Two-Factor Authentication</strong> (scan a QR code into an authenticator app, confirm a code, done &mdash; same flow as the appliance's admin 2FA).</p>
-        </div>
-        <div class="card">
-          <h4>Password Policy</h4>
-          <p>Applies to hub admin accounts only. Sites authenticate to the hub by key, not password, so this doesn't touch them.</p>
-        </div>
-        <div class="card">
-          <h4>Hub SSH Host Key</h4>
-          <p>The fingerprint a site should pin in its own Central Office panel, so its tunnel connection verifies it's really talking to this hub before trusting it.</p>
-        </div>
+    <section id="tab-system">
+      <h3 id="tab-system-inner">System</h3>
+      <div class="card">
+        <h4>Password Policy</h4>
+        <p>Applies to hub admin accounts only. Sites authenticate to the hub by key, not password, so this doesn't touch them.</p>
+      </div>
+      <div class="card">
+        <h4>Hub SSH Host Key</h4>
+        <p>The fingerprint a site should pin in its own Central Office panel, so its tunnel connection verifies it's really talking to this hub before trusting it.</p>
       </div>
       <div class="card">
         <h4 id="high-availability-inner">High Availability</h4>
@@ -610,6 +613,24 @@
       <div class="card">
         <h4>Backup &amp; Restore</h4>
         <p>Saves or replaces this hub's <em>entire</em> configuration &mdash; sites, users, groups, grants, admin accounts &mdash; as a single JSON file. This is the hub's own fleet configuration, separate from any individual site's backup (handled per-site from the <a href="#tab-sites">Sites</a> tab).</p>
+      </div>
+      <div class="card">
+        <h4>External Syslog Server</h4>
+        <p>Mirrors every <code>[AUDIT]</code> entry to an external syslog server in real time, over UDP using the standard BSD (RFC&nbsp;3164) format. Off by default. Fill in the server's host and port (<code>514</code> is the usual default) and a facility, then <strong>Save Settings</strong>; <strong>Send Test Message</strong> confirms it's reaching the collector without waiting for a real event. Packets from this hub are tagged <code>central-office:</code>, distinct from the <code>terminalserver:</code> tag a site's own syslog forwarding uses &mdash; so a shared collector can tell the two apart.</p>
+      </div>
+    </section>
+
+    <section id="tab-account">
+      <h3 id="tab-account-inner">Admins</h3>
+      <div class="tab-grid">
+        <div class="card">
+          <h4>My Account</h4>
+          <p>Change your own hub admin password, and turn on <strong>Two-Factor Authentication</strong> (scan a QR code into an authenticator app, confirm a code, done &mdash; same flow as the appliance's admin 2FA).</p>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Admin Accounts</h4>
+        <p>This hub supports more than one admin account, managed here &mdash; the same create/rename/delete/reset-password shape as the appliance's own Admin Account tab. <strong>+ Add Admin</strong> creates one with a username and password; <strong>Edit</strong> on a row renames it or resets its password (leave the password blank to keep the existing one); <strong>Delete</strong> removes it. You can't delete the account you're currently logged in as, and the hub always keeps at least one admin account &mdash; the last one can't be deleted at all, from any session.</p>
       </div>
     </section>
 
@@ -631,7 +652,7 @@
       <p class="lede">Optional automatic failover across two hub VMs, so the hub itself isn't a single point of failure for the whole fleet. A standalone <code>ha-agent</code> process runs on both nodes at all times, independent of the main hub app: it health-checks its peer, and if the peer goes unreachable past a threshold, promotes itself &mdash; final data pull, claim the shared address (or update DNS), start the hub service.</p>
       <div class="card">
         <h4>Configuring it</h4>
-        <p>Everything is set from <strong>Account &rarr; High Availability</strong> on each node &mdash; no file to hand-edit. Fill in:</p>
+        <p>Everything is set from <strong>System &rarr; High Availability</strong> on each node &mdash; no file to hand-edit. Fill in:</p>
         <ul>
           <li><strong>Role</strong> &mdash; Primary on one VM, Secondary on the other.</li>
           <li><strong>Failover mode</strong> &mdash; <strong>Virtual IP</strong> (a floating address that moves between nodes on the same network segment, fails over in seconds) or <strong>DNS update</strong> (runs a script you supply to repoint your own DNS record, works across subnets but is only as fast as DNS caching allows).</li>
@@ -654,7 +675,7 @@
       <h2>Security notes</h2>
       <ul>
         <li>Site tunnels are outbound-only from the site's side &mdash; the hub never needs an inbound connection to a site to manage it.</li>
-        <li>Pin a site's own SSH host key fingerprint (available on that site's Central Office panel) and this hub's own fingerprint (Account tab) on both ends once, so a future connection to something impersonating either side gets rejected instead of silently trusted.</li>
+        <li>Pin a site's own SSH host key fingerprint (available on that site's Central Office panel) and this hub's own fingerprint (System tab) on both ends once, so a future connection to something impersonating either side gets rejected instead of silently trusted.</li>
         <li>A read-only grant is enforced on the hub side, in the tunnel-bridging code itself &mdash; a read-only session's keystrokes never reach the wire toward the site at all, rather than being filtered after the fact.</li>
         <li>Sync Admins is only ever triggered by an explicit hub-admin action; it never runs automatically as a side effect of anything else.</li>
       </ul>
