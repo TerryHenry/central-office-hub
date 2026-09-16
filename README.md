@@ -137,8 +137,10 @@ expected path -- use the panel, which validates input before writing it.
 
 The Account tab's **Version & Updates** panel checks GitHub for a newer release and, if
 one publishes an in-place update package, applies it directly: download, checksum
-verification, syntax-check the new version before touching anything live, `npm
-install`, back up the current version, swap in the new one, restart. One level of undo
+verification, signature verification against a public key baked in at build time
+(never fetched from GitHub), syntax-check the new version before touching anything
+live, `npm install`, back up the current version, swap in the new one, restart. One
+level of undo
 (**Roll Back to Previous Version**) is available from the same panel as long as the
 service is still healthy enough to serve the request; if a bad update leaves it unable
 to, `sudo bash /opt/central-office/provisioning/rollback-update.sh` over SSH restores
@@ -147,20 +149,38 @@ the backup directly.
 ### Publishing a release
 
 For a release to be self-update-capable (and for `build-vm.sh` to pick it up), its
-GitHub Release needs two assets:
+GitHub Release needs three assets:
 
 - `central-office-app.tar.gz` -- `server.js`, `package.json`/`package-lock.json`,
   `lib/`, `webui/`, `provisioning/` (no `node_modules`).
 - `central-office-app.tar.gz.sha256` -- its checksum. The updater refuses to apply a
   download that doesn't match this exactly.
+- `central-office-app.tar.gz.sig` -- a detached Ed25519 signature over the checksum
+  file, verified against `release-signing-pubkey.pem` (committed at the repo root,
+  never fetched from GitHub). The checksum alone only proves a download matches what
+  GitHub is *currently* serving, not who put it there -- anyone with release access
+  (or a hijacked release pipeline) could otherwise publish a tarball and a matching
+  checksum together. The signature is what actually proves authorship.
 
 ```bash
 tar -czf build/central-office-app.tar.gz \
   --exclude='node_modules' --exclude='build' --exclude='.DS_Store' \
   server.js package.json package-lock.json lib webui provisioning
 shasum -a 256 build/central-office-app.tar.gz | awk '{print $1}' > build/central-office-app.tar.gz.sha256
-gh release create vX.Y build/central-office-app.tar.gz build/central-office-app.tar.gz.sha256
+node scripts/sign-release.js build/central-office-app.tar.gz.sha256 \
+  /path/to/release-signing-key.PRIVATE.pem build/central-office-app.tar.gz.sig
+gh release create vX.Y build/central-office-app.tar.gz build/central-office-app.tar.gz.sha256 build/central-office-app.tar.gz.sig
 ```
+
+Keep the private key out of this repo entirely (password manager, hardware key,
+offline storage) and pass its path in explicitly every time -- this is a **separate
+keypair from the appliance's own** (SerialKillerTermServer), so a compromise of one
+doesn't hand over the other. To generate a new keypair (only ever needed once, or when
+deliberately rotating): `node -e "const{publicKey,privateKey}=require('crypto').generateKeyPairSync('ed25519',{publicKeyEncoding:{type:'spki',format:'pem'},privateKeyEncoding:{type:'pkcs8',format:'pem'}});console.log(publicKey,privateKey)"`
+-- commit the public half as `release-signing-pubkey.pem` at the repo root, and move
+the private half somewhere secure immediately. A release published without a valid
+signature still shows up in **Check for Updates**, just without an **Apply Update**
+button.
 
 ## Notes / limitations
 

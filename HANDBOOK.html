@@ -683,6 +683,7 @@
         <li>The TLS pin is a separate gap from the SSH one: the host key covers the tunnel, the TLS certificate covers a site's separate HTTPS calls for enrollment, its heartbeat, and config backups. A config backup carries that site's admin password hashes and TOTP secrets, so once pinned, a later call presenting a different certificate is rejected outright rather than an on-path observer being able to read them.</li>
         <li>A read-only grant is enforced on the hub side, in the tunnel-bridging code itself &mdash; a read-only session's keystrokes never reach the wire toward the site at all, rather than being filtered after the fact.</li>
         <li>Sync Admins is only ever triggered by an explicit hub-admin action; it never runs automatically as a side effect of anything else.</li>
+        <li>This hub's own <strong>Apply Update</strong> verifies a detached signature over the release checksum, not just the checksum itself &mdash; a checksum published in the same release as the tarball only proves the download matches what GitHub is currently serving, not who published it. The signature is checked against a public key baked in at build time (committed in this repo, or written directly onto the VM appliance image by <code>build-vm.sh</code>) and never fetched from GitHub, so a release without a valid signature is refused outright rather than applied on trust.</li>
       </ul>
     </section>
 
