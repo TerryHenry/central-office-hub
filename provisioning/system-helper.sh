@@ -87,9 +87,21 @@ case "${1:-}" in
       echo "hostname too long: $hostname" >&2
       exit 1
     fi
+    hostnamectl set-hostname "$hostname"
+    # hostnamectl only changes the kernel/system hostname -- it never touches
+    # /etc/hosts, so the conventional "127.0.1.1 <hostname>" line there silently keeps
+    # naming the OLD hostname. The moment the two diverge, anything that resolves the
+    # local hostname for itself (sudo included, for its own logging) starts failing
+    # with "unable to resolve host <name>: Name or service not known" -- found live,
+    # not by inspection, on a renamed box. Update that line to match, or add it fresh
+    # if this image never had one.
+    if grep -q '^127\.0\.1\.1[[:space:]]' /etc/hosts; then
+      sed -i "s/^127\.0\.1\.1[[:space:]].*/127.0.1.1\t$hostname/" /etc/hosts
+    else
+      printf '127.0.1.1\t%s\n' "$hostname" >> /etc/hosts
+    fi
     # No mDNS (.local) handling here -- unlike the appliance, the hub doesn't advertise
     # one, so there's nothing to keep in sync with the hostname change.
-    exec hostnamectl set-hostname "$hostname"
     ;;
   *)
     echo "usage: system-helper.sh {service-restart|ntp-set <server>|timezone-set <tz>|dns-set <servers...>|dns-clear|ip-set <conn> <addr> <prefix> <gw>|ip-clear <conn>|hostname-set <name>}" >&2
