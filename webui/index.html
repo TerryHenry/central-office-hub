@@ -46,6 +46,21 @@
     </form>
   </div>
 
+  <!-- Forced 2FA enrollment: shown after logging in when the password policy requires
+       two-factor authentication for admins and this account hasn't set it up yet -->
+  <div class="auth-screen" id="force2faScreen">
+    <form class="auth-card" id="force2faForm">
+      <h1>Set up two-factor authentication</h1>
+      <p class="hint">This hub requires two-factor authentication on every admin account. Scan this code with an authenticator app (Google Authenticator, Authy, 1Password, etc.), then enter the 6-digit code it generates to continue.</p>
+      <div id="force2faQrContainer"></div>
+      <p class="hint">Or enter this secret manually: <code id="force2faSecretText"></code></p>
+      <label>Code</label>
+      <input type="text" id="force2faCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required />
+      <div class="auth-error" id="force2faError"></div>
+      <button type="submit" class="primary">Verify &amp; Continue</button>
+    </form>
+  </div>
+
   <!-- Main app -->
   <div class="app" id="appRoot">
     <div class="titlebar">
@@ -412,6 +427,11 @@
         <div class="field-row">
           <label for="policyCheckBreached">Reject common/breached passwords</label>
           <input type="checkbox" id="policyCheckBreached" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireAdminTotp">Require two-factor authentication for admin accounts</label>
+          <input type="checkbox" id="policyRequireAdminTotp" />
+          <span class="hint">Unlike the settings above, this one only applies to hub admin accounts. An admin without 2FA set up is walked through enrolling it immediately after their next login, before reaching anything else &mdash; including you, if your own account doesn't have it on yet.</span>
         </div>
         <div class="field-row">
           <button id="savePasswordPolicyBtn">Save Settings</button>

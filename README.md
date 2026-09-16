@@ -25,7 +25,10 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
 - **Host-key pinning** -- an edge box can pin this hub's SSH host key, closing a
   man-in-the-middle gap on the tunnel connection.
 - **Optional TOTP** -- two-factor auth for hub admin accounts, off by default. Multiple
-  admin accounts are supported, same as the appliance's own admin-account system.
+  admin accounts are supported, same as the appliance's own admin-account system. The
+  Password Policy panel can also *require* it for every admin account instead of
+  leaving it opt-in -- an admin without it set up is walked straight into enrollment
+  immediately after their next login, before reaching anything else.
 - **Live device scan, site info, and TFTP push** -- request/response queries over a
   connected site's existing tunnel (not the heartbeat poll): enumerate its available
   serial devices, pull a live hostname/IP/CPU/memory snapshot, or push a file straight

@@ -45,6 +45,7 @@ function escapeHtml(str) {
 const loginScreen = document.getElementById('loginScreen');
 const totpScreen = document.getElementById('totpScreen');
 const forceChangeScreen = document.getElementById('forceChangeScreen');
+const force2faScreen = document.getElementById('force2faScreen');
 const appRoot = document.getElementById('appRoot');
 
 // ---------- Password policy ----------
@@ -65,6 +66,7 @@ async function loadPasswordPolicy() {
     document.getElementById('policyRequireDigit').checked = policy.requireDigit;
     document.getElementById('policyRequireSymbol').checked = policy.requireSymbol;
     document.getElementById('policyCheckBreached').checked = policy.checkBreached;
+    document.getElementById('policyRequireAdminTotp').checked = policy.requireAdminTotp;
   } catch {
     // hints just stay at their static fallback
   }
@@ -74,13 +76,23 @@ document.getElementById('savePasswordPolicyBtn').addEventListener('click', async
   const msg = document.getElementById('passwordPolicyMsg');
   msg.style.color = 'var(--danger)';
   msg.textContent = '';
+  const requireAdminTotp = document.getElementById('policyRequireAdminTotp').checked;
+  // Turning this on doesn't exempt whoever's saving it -- if their own account has no
+  // 2FA yet, they'll be walked into the same forced setup as anyone else on their very
+  // next request, so it's worth a heads-up before that happens with no warning.
+  if (requireAdminTotp && !(await api.get('/api/session')).totpEnabled) {
+    if (!confirm("Your own admin account doesn't have two-factor authentication set up yet. Saving this will immediately require you to set it up too, before you can do anything else. Continue?")) {
+      return;
+    }
+  }
   try {
     await api.post('/api/password-policy', {
       minLength: Number(document.getElementById('policyMinLength').value),
       requireMixedCase: document.getElementById('policyRequireMixedCase').checked,
       requireDigit: document.getElementById('policyRequireDigit').checked,
       requireSymbol: document.getElementById('policyRequireSymbol').checked,
-      checkBreached: document.getElementById('policyCheckBreached').checked
+      checkBreached: document.getElementById('policyCheckBreached').checked,
+      requireAdminTotp
     });
     await loadPasswordPolicy();
     msg.style.color = 'var(--ok)';
@@ -109,21 +121,32 @@ async function boot() {
     document.body.classList.remove('app-mode');
     return;
   }
-  document.body.classList.add('app-mode');
-  show(appRoot);
-  await initApp();
-}
-
-// Shared by the password-only login and the post-2FA login -- both return the same
-// { mustChangePassword } shape once the session is actually established.
-async function completeLogin(result) {
-  if (result.mustChangePassword) {
-    show(forceChangeScreen);
+  if (session.mustEnableTotp) {
+    await enterForce2fa();
+    document.body.classList.remove('app-mode');
     return;
   }
   document.body.classList.add('app-mode');
   show(appRoot);
   await initApp();
+}
+
+// Starts (or resumes) the forced-2FA-enrollment screen: fetches a fresh secret/QR the
+// same way the self-service "Enable 2FA" flow does, since this is that exact same
+// setup, just presented as a screen the admin can't get past instead of a tab panel.
+async function enterForce2fa() {
+  const errorEl = document.getElementById('force2faError');
+  errorEl.textContent = '';
+  try {
+    const { secret, otpauthUrl } = await api.post('/api/admin-2fa/setup');
+    document.getElementById('force2faSecretText').textContent = secret;
+    document.getElementById('force2faCode').value = '';
+    window.renderTotpQr(document.getElementById('force2faQrContainer'), otpauthUrl);
+    show(force2faScreen);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    show(force2faScreen);
+  }
 }
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -141,7 +164,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       show(totpScreen);
       return;
     }
-    await completeLogin(result);
+    await boot();
   } catch (err) {
     errorEl.textContent = 'Invalid username or password.';
   }
@@ -152,9 +175,9 @@ document.getElementById('totpForm').addEventListener('submit', async (e) => {
   const errorEl = document.getElementById('totpError');
   errorEl.textContent = '';
   try {
-    const result = await api.post('/api/login-totp', { token: document.getElementById('totpCode').value.trim() });
+    await api.post('/api/login-totp', { token: document.getElementById('totpCode').value.trim() });
     hide(totpScreen);
-    await completeLogin(result);
+    await boot();
   } catch (err) {
     errorEl.textContent = err.message === 'invalid_code' ? 'Wrong code. Try again.' : err.message;
     document.getElementById('totpCode').value = '';
@@ -175,11 +198,25 @@ document.getElementById('forceChangeForm').addEventListener('submit', async (e) 
   try {
     await api.post('/api/admin-password', { password });
     hide(forceChangeScreen);
-    document.body.classList.add('app-mode');
-    show(appRoot);
-    await initApp();
+    await boot();
   } catch (err) {
     errorEl.textContent = err.message;
+  }
+});
+
+document.getElementById('force2faForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('force2faError');
+  errorEl.textContent = '';
+  const token = document.getElementById('force2faCode').value.trim();
+  try {
+    await api.post('/api/admin-2fa/confirm', { token });
+    hide(force2faScreen);
+    await boot();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    document.getElementById('force2faCode').value = '';
+    document.getElementById('force2faCode').focus();
   }
 });
 

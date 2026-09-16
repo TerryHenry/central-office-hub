@@ -439,7 +439,7 @@
       <p>Visit <code>https://&lt;hub-host&gt;:8443</code> (accept the self-signed certificate warning on a fresh install) and sign in with <code>admin</code> / <code>letmein0!</code>. You'll be required to set a new password immediately, enforced by the server itself &mdash; there's no way to skip it.</p>
       <div class="callout tip">
         <span class="mark">Optional 2FA</span>
-        <p>Turn on two-factor authentication for this account any time from <a href="#tab-account">Admins &rarr; Two-Factor Authentication</a>. Off by default.</p>
+        <p>Turn on two-factor authentication for this account any time from <a href="#tab-account">Admins &rarr; Two-Factor Authentication</a>. Off by default, but an admin can make it mandatory for every account from <a href="#tab-account">Admins &rarr; Password Policy</a> instead of leaving it up to each person to remember.</p>
       </div>
     </section>
 
@@ -601,6 +601,7 @@
       <div class="card">
         <h4>Password Policy</h4>
         <p>Applies to hub admin accounts only. Sites authenticate to the hub by key, not password, so this doesn't touch them.</p>
+        <p><strong>Require two-factor authentication for admin accounts</strong> turns 2FA from opt-in into mandatory: any admin without it set up is walked straight into enrollment (scan a QR, enter the code) immediately after their next login, before reaching anything else in the API or UI &mdash; including whoever just turned the setting on, if their own account doesn't have it yet.</p>
       </div>
       <div class="card">
         <h4>Hub SSH Host Key</h4>
