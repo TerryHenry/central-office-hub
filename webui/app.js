@@ -773,18 +773,61 @@ const ACCESS_OPTIONS = [
 function addSitePortRow(port) {
   const tbody = document.querySelector('#sitePortsTable tbody');
   const tr = document.createElement('tr');
+  // Delete only ever applies to a port that already exists on the server (it calls
+  // DELETE /api/sites/:id/ports/:portId immediately) -- a row added via + Add Port or
+  // Scan has no portId yet, so it only ever gets Remove (a plain client-side
+  // tr.remove(), staged until Queue Port Configuration is clicked).
+  const deleteBtn = port?.id ? '<button class="danger delete-port-btn">Delete…</button>' : '';
   tr.innerHTML = `
     <td><input type="text" class="site-port-label" value="${escapeHtml(port?.label || '')}" placeholder="e.g. Router Console" /></td>
     <td><input type="text" class="site-port-path" value="${escapeHtml(port?.path || '')}" placeholder="/dev/ttyUSB0" /></td>
     <td><input type="number" class="site-port-baud" value="${port?.baudRate || 9600}" style="width: 5.5em" /></td>
     <td><select class="site-port-access">${ACCESS_OPTIONS.map(([v, l]) => `<option value="${v}" ${port?.access === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
     <td><input type="checkbox" class="site-port-capture" ${port?.captureEnabled ? 'checked' : ''} /></td>
-    <td><button class="secondary remove-port-row-btn">Remove</button></td>
+    <td><button class="secondary remove-port-row-btn">Remove</button>${deleteBtn}</td>
   `;
   tr.dataset.portId = port?.id || '';
   tr.querySelector('.remove-port-row-btn').addEventListener('click', () => tr.remove());
+  const delBtn = tr.querySelector('.delete-port-btn');
+  if (delBtn) {
+    delBtn.addEventListener('click', () => {
+      const siteId = document.getElementById('sitePortsSiteId').value;
+      openDeletePortModal(siteId, port.id, tr.querySelector('.site-port-label').value.trim() || port.label || 'this port');
+    });
+  }
   tbody.appendChild(tr);
 }
+
+// ---------- Delete a single port immediately (hub-only, or hub + edge) ----------
+function openDeletePortModal(siteId, portId, label) {
+  document.getElementById('deletePortSiteId').value = siteId;
+  document.getElementById('deletePortPortId').value = portId;
+  document.getElementById('deletePortLabel').textContent = label;
+  document.getElementById('deletePortRemoveFromEdge').checked = true;
+  document.getElementById('deletePortError').textContent = '';
+  document.getElementById('deletePortModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelDeletePortBtn').addEventListener('click', () => {
+  document.getElementById('deletePortModalBackdrop').classList.remove('open');
+});
+document.getElementById('confirmDeletePortBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('deletePortSiteId').value;
+  const portId = document.getElementById('deletePortPortId').value;
+  const removeFromEdge = document.getElementById('deletePortRemoveFromEdge').checked;
+  const errEl = document.getElementById('deletePortError');
+  errEl.textContent = '';
+  try {
+    await api.del(`/api/sites/${siteId}/ports/${portId}?removeFromEdge=${removeFromEdge}`);
+    document.getElementById('deletePortModalBackdrop').classList.remove('open');
+    // Drop the row from the still-open Configure Ports table too, so the admin sees it
+    // gone immediately instead of having to reopen the modal.
+    const row = document.querySelector(`#sitePortsTable tbody tr[data-port-id="${CSS.escape(portId)}"]`);
+    if (row) row.remove();
+    await loadSites();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
 
 function openSitePortsModal(site) {
   document.getElementById('sitePortsSiteId').value = site.id;

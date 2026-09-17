@@ -877,6 +877,26 @@
     </div>
   </div>
 
+  <!-- Delete port modal -->
+  <div class="modal-backdrop" id="deletePortModalBackdrop">
+    <div class="modal">
+      <h3>Delete Port</h3>
+      <p class="hint">Deletes <strong id="deletePortLabel"></strong> from this site right now -- unlike Remove above, this doesn't wait for a Queue Port Configuration save.</p>
+      <div class="field-row">
+        <label for="deletePortRemoveFromEdge">Also remove it from the site's own configuration</label>
+        <input type="checkbox" id="deletePortRemoveFromEdge" checked />
+      </div>
+      <p class="hint">Checked (recommended): also queues the removal on the site itself, applied on its next heartbeat -- same effect as removing it in Configure Ports and saving. Unchecked: only removes it from this hub's own display. If the site is still online and still configured with this port, its next heartbeat reports it again and it reappears here.</p>
+      <input type="hidden" id="deletePortSiteId" />
+      <input type="hidden" id="deletePortPortId" />
+      <span class="field-error" id="deletePortError"></span>
+      <div class="modal-actions">
+        <button id="cancelDeletePortBtn" class="secondary">Cancel</button>
+        <button id="confirmDeletePortBtn" class="danger">Delete Port</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Local access modal -->
   <div class="modal-backdrop" id="siteLocalAccessModalBackdrop">
     <div class="modal">
