@@ -1,5 +1,14 @@
 'use strict';
 
+// Populated from every /api/session response (see boot() and the status poll below) and
+// echoed back on every mutating request -- the server compares it against the same
+// value it handed out for this session, so a cross-site request (which never sees this
+// response) has no way to produce it, on top of whatever SameSite already blocks.
+let csrfToken = null;
+function csrfHeaders() {
+  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+}
+
 const api = {
   async get(url) {
     const res = await fetch(url);
@@ -7,12 +16,16 @@ const api = {
     return res.json();
   },
   async post(url, body) {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
+      body: JSON.stringify(body || {})
+    });
     if (!res.ok) throw await apiError(res);
     return res.json();
   },
   async del(url) {
-    const res = await fetch(url, { method: 'DELETE' });
+    const res = await fetch(url, { method: 'DELETE', headers: csrfHeaders() });
     if (!res.ok) throw await apiError(res);
     return res.json();
   }
@@ -106,6 +119,7 @@ document.getElementById('savePasswordPolicyBtn').addEventListener('click', async
 async function boot() {
   await loadPasswordPolicy();
   const session = await api.get('/api/session');
+  csrfToken = session.csrfToken;
   if (session.needsTotp) {
     show(totpScreen);
     document.body.classList.remove('app-mode');
@@ -738,7 +752,7 @@ document.getElementById('saveSiteRestoreBtn').addEventListener('click', async ()
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch(`/api/sites/${siteId}/backup/restore`, { method: 'POST', body: formData });
+    const res = await fetch(`/api/sites/${siteId}/backup/restore`, { method: 'POST', headers: csrfHeaders(), body: formData });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     document.getElementById('siteRestoreModalBackdrop').classList.remove('open');
@@ -997,13 +1011,13 @@ document.getElementById('saveSiteTftpUploadBtn').addEventListener('click', async
   formData.append('file', file);
   try {
     if (siteIds.length === 1) {
-      const res = await fetch(`/api/sites/${siteIds[0]}/tftp-upload`, { method: 'POST', body: formData });
+      const res = await fetch(`/api/sites/${siteIds[0]}/tftp-upload`, { method: 'POST', headers: csrfHeaders(), body: formData });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       resultsEl.innerHTML = `<p class="hint">Uploaded "${escapeHtml(body.filename)}" (${formatBytes(body.bytesWritten)}).</p>`;
     } else {
       formData.append('siteIds', JSON.stringify(siteIds));
-      const res = await fetch('/api/sites/tftp-upload/bulk', { method: 'POST', body: formData });
+      const res = await fetch('/api/sites/tftp-upload/bulk', { method: 'POST', headers: csrfHeaders(), body: formData });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       resultsEl.innerHTML = body.results
@@ -1740,6 +1754,7 @@ function setTotpStatusUi(enabled) {
 
 async function loadTotpStatus() {
   const session = await api.get('/api/session');
+  csrfToken = session.csrfToken;
   setTotpStatusUi(!!session.totpEnabled);
 }
 
@@ -1946,7 +1961,7 @@ document.getElementById('restoreBtn').addEventListener('click', async () => {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch('/api/restore', { method: 'POST', body: formData });
+    const res = await fetch('/api/restore', { method: 'POST', headers: csrfHeaders(), body: formData });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     msg.style.color = 'var(--ok)';
@@ -2425,7 +2440,7 @@ document.getElementById('tftpUploadInput').addEventListener('change', async (e) 
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch('/api/tftp/files', { method: 'POST', body: formData });
+    const res = await fetch('/api/tftp/files', { method: 'POST', headers: csrfHeaders(), body: formData });
     if (!res.ok) throw await apiError(res);
     await loadTftpFiles();
   } catch (err) {
@@ -2502,7 +2517,7 @@ document.getElementById('uploadTlsCertBtn').addEventListener('click', async () =
   formData.append('cert', certFile);
   formData.append('key', keyFile);
   try {
-    const res = await fetch('/api/tls/upload', { method: 'POST', body: formData });
+    const res = await fetch('/api/tls/upload', { method: 'POST', headers: csrfHeaders(), body: formData });
     if (!res.ok) throw await apiError(res);
     document.getElementById('tlsCertFile').value = '';
     document.getElementById('tlsKeyFile').value = '';
@@ -2579,7 +2594,7 @@ document.getElementById('importUsersInput').addEventListener('change', async (e)
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch('/api/users/import', { method: 'POST', body: formData });
+    const res = await fetch('/api/users/import', { method: 'POST', headers: csrfHeaders(), body: formData });
     if (!res.ok) throw await apiError(res);
     const result = await res.json();
     let summary = `Imported ${result.created.length} user${result.created.length === 1 ? '' : 's'}.`;
