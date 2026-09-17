@@ -24,6 +24,10 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   own Central Office panel, and it enrolls itself (no manual public-key copy required).
 - **Automatic port reporting** -- an enrolled box in managed mode heartbeats its
   configured ports and version every 30s; the hub's Sites list stays current on its own.
+  Once a box's tunnel is up, its heartbeat and config-backup calls prefer riding over
+  that same tunnel connection rather than a second direct connection to this hub's web
+  API port, so an admin only has to keep the tunnel port open on an ongoing basis --
+  the API port still matters for enrollment and for a box's very first heartbeat.
 - **Polled in-place upgrades** -- queue an update for a site from here; it's applied on
   the box's own next heartbeat, using its own existing self-update pipeline.
 - **Host-key pinning** -- an edge box can pin this hub's SSH host key, closing a
