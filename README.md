@@ -22,12 +22,19 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   across any number of sites, without handing them an admin account.
 - **Enrollment tokens** -- generate a one-time token here, paste it into the edge box's
   own Central Office panel, and it enrolls itself (no manual public-key copy required).
+  Tries the tunnel/SSH listener port first (a short-lived connection authenticated only
+  by holding the token itself), falling back to a direct call to this hub's web API
+  port only if that doesn't work -- so an admin who's only opened the tunnel port
+  through a firewall can enroll a new box over it too, not just heartbeat an existing
+  one.
 - **Automatic port reporting** -- an enrolled box in managed mode heartbeats its
   configured ports and version every 30s; the hub's Sites list stays current on its own.
   Once a box's tunnel is up, its heartbeat and config-backup calls prefer riding over
-  that same tunnel connection rather than a second direct connection to this hub's web
-  API port, so an admin only has to keep the tunnel port open on an ongoing basis --
-  the API port still matters for enrollment and for a box's very first heartbeat.
+  that same tunnel connection too, rather than a second direct connection to this hub's
+  web API port -- so with enrollment tunneled as well, an admin only ever has to keep
+  the tunnel port open on an ongoing basis. The API port still matters as a fallback:
+  for a box's very first heartbeat before its tunnel finishes connecting, and for
+  enrollment or heartbeat whenever the tunnel itself can't be reached.
 - **Polled in-place upgrades** -- queue an update for a site from here; it's applied on
   the box's own next heartbeat, using its own existing self-update pipeline.
 - **Host-key pinning** -- an edge box can pin this hub's SSH host key, closing a

@@ -486,7 +486,7 @@
       </div>
       <div class="card">
         <h4>Adding a site</h4>
-        <p>Two ways to enroll: paste the site's own tunnel public key directly (shown on its Central Office panel), or generate a token here under <strong>Enrollment Tokens</strong> and paste that into the site instead &mdash; it fills in the hub's own address and registers the key in one step, without copying anything by hand.</p>
+        <p>Two ways to enroll: paste the site's own tunnel public key directly (shown on its Central Office panel), or generate a token here under <strong>Enrollment Tokens</strong> and paste that into the site instead &mdash; it fills in the hub's own address and registers the key in one step, without copying anything by hand. A token-based enrollment tries the tunnel/SSH listener port first (a short-lived connection authenticated only by holding a live, unredeemed token, distinct from an already-enrolled site's own key-based tunnel), falling back to a direct call to this hub's web API port only if that doesn't work &mdash; so an admin who's only opened the tunnel port through a firewall can still enroll a new site over it, not just run an already-enrolled one's ongoing heartbeats.</p>
       </div>
       <div class="card">
         <h4>Per-site actions</h4>
@@ -609,7 +609,7 @@
       </div>
       <div class="card">
         <h4>Tunnel / SSH Listener</h4>
-        <p>The one port every enrolled site's tunnel connects to (and an admin-tunnel SSH session uses too) &mdash; default <code>443</code>, changeable here if this network needs something else. Saving only persists the new value; it takes effect on the next restart (TLS Certificate panel's <strong>Restart Service Now</strong>, or any other restart). Once that happens, every currently-connected site's tunnel drops immediately, and each one needs its own Central Office panel's Tunnel Port updated to match before it can reconnect &mdash; this is a fleet-wide change, not a hub-only setting, so treat it as a coordinated migration rather than a quick toggle. A connected site's heartbeat and config-backup traffic ride over this same tunnel once it's up (see the API Port note below), so for an already-enrolled fleet this is, in practice, the only port that has to stay reachable on an ongoing basis.</p>
+        <p>The one port every enrolled site's tunnel connects to (and an admin-tunnel SSH session uses too) &mdash; default <code>443</code>, changeable here if this network needs something else. Saving only persists the new value; it takes effect on the next restart (TLS Certificate panel's <strong>Restart Service Now</strong>, or any other restart). Once that happens, every currently-connected site's tunnel drops immediately, and each one needs its own Central Office panel's Tunnel Port updated to match before it can reconnect &mdash; this is a fleet-wide change, not a hub-only setting, so treat it as a coordinated migration rather than a quick toggle. A site's enrollment, heartbeat, and config-backup traffic all prefer riding over this same tunnel (see the TLS Certificate note below), falling back to the web API port only when the tunnel can't be reached at that moment &mdash; so in practice this is the only port a fleet needs open on an ongoing basis, enrollment included.</p>
       </div>
       <div class="card">
         <h4 id="high-availability-inner">High Availability</h4>
@@ -617,7 +617,7 @@
       </div>
       <div class="card">
         <h4>TLS Certificate</h4>
-        <p>Covers this admin UI's own HTTPS certificate. A self-signed one is generated automatically on first boot; upload your own to replace it. The fingerprint shown here is also what a site should pin as its own <strong>Hub TLS certificate fingerprint</strong>, separate from the SSH host key above &mdash; it protects a different set of calls (enrollment, the heartbeat, and config backups) that talk to this hub's web API port directly rather than through its tunnel listener. A site's heartbeat and backup calls only actually need that web API port reachable for enrollment and for the very first heartbeat after enabling Managed mode; once its tunnel is up, both prefer riding over the tunnel connection itself instead, falling back to a direct call here only if the tunnel happens to be down at that moment.</p>
+        <p>Covers this admin UI's own HTTPS certificate. A self-signed one is generated automatically on first boot; upload your own to replace it. The fingerprint shown here is also what a site should pin as its own <strong>Hub TLS certificate fingerprint</strong>, separate from the SSH host key above &mdash; it protects a different set of calls (enrollment, the heartbeat, and config backups) whenever they end up talking to this hub's web API port directly instead of through its tunnel listener. All three prefer the tunnel first now &mdash; enrollment over a short-lived, token-authenticated connection; heartbeat and backup over an already-enrolled site's own persistent tunnel &mdash; falling back to a direct call to the web API port only when the tunnel can't be reached at that moment (including a site's very first heartbeat, in the brief window before its tunnel finishes connecting).</p>
       </div>
       <div class="card">
         <h4>Backup &amp; Restore</h4>
