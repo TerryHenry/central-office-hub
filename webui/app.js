@@ -2090,6 +2090,43 @@ document.getElementById('testSyslogBtn').addEventListener('click', async () => {
   }
 });
 
+async function loadAlertsSettings() {
+  const alerts = await api.get('/api/alerts');
+  document.getElementById('alertsWebhookUrl').value = alerts.webhookUrl;
+  document.getElementById('alertsNotifyOnSiteOffline').checked = alerts.notifyOnSiteOffline;
+  document.getElementById('alertsNotifyOnLockout').checked = alerts.notifyOnLockout;
+}
+
+document.getElementById('saveAlertsBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('alertsMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/alerts', {
+      webhookUrl: document.getElementById('alertsWebhookUrl').value.trim(),
+      notifyOnSiteOffline: document.getElementById('alertsNotifyOnSiteOffline').checked,
+      notifyOnLockout: document.getElementById('alertsNotifyOnLockout').checked
+    });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Saved.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('testAlertsBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('alertsMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/alerts/test');
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Test alert sent.';
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
 let eventSource = null;
 function connectEvents() {
   if (eventSource) eventSource.close();
@@ -2704,6 +2741,7 @@ async function initApp() {
   await loadCaptures();
   await loadLogHistory();
   await loadSyslogSettings();
+  await loadAlertsSettings();
   connectEvents();
 }
 

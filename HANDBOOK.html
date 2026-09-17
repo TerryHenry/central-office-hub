@@ -627,6 +627,10 @@
         <h4>External Syslog Server</h4>
         <p>Mirrors every <code>[AUDIT]</code> entry to an external syslog server in real time, over UDP using the standard BSD (RFC&nbsp;3164) format. Off by default. Fill in the server's host and port (<code>514</code> is the usual default) and a facility, then <strong>Save Settings</strong>; <strong>Send Test Message</strong> confirms it's reaching the collector without waiting for a real event. Packets from this hub are tagged <code>central-office:</code>, distinct from the <code>terminalserver:</code> tag a site's own syslog forwarding uses &mdash; so a shared collector can tell the two apart.</p>
       </div>
+      <div class="card">
+        <h4>Alert Webhook</h4>
+        <p>POSTs a small JSON payload (<code>{event, timestamp, ...details}</code>) to a URL of your choice for two kinds of event, each independently togglable and both on by default once a URL is set: a site's tunnel dropping (<code>site_offline</code>, with <code>siteId</code>/<code>siteName</code>), and an admin account getting locked out after repeated failed logins (<code>admin_lockout</code>, with <code>username</code>/<code>ip</code>) &mdash; the second one is worth paying attention to, since it usually means someone's actively guessing a password. Off by default (blank URL). <strong>Send Test Alert</strong> posts an <code>event: "test"</code> payload so you can confirm the URL actually works, the same way <strong>Send Test Message</strong> does for syslog above. Delivery is fire-and-forget with a 10-second timeout &mdash; a slow or unreachable webhook endpoint never blocks or affects anything else this hub is doing; a failed delivery is only ever noted in the Log tab, tagged <code>[ALERT]</code>.</p>
+      </div>
     </section>
 
     <section id="tab-account">

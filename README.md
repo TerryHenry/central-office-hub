@@ -50,6 +50,10 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   into its TFTP directory, singly or across several sites at once.
 - **Remote port and TFTP-server configuration** -- add/edit/remove a site's serial ports,
   or start/stop/configure its TFTP server, queued and applied on its next heartbeat.
+- **Alert webhook** -- POST a JSON payload to a URL of your choice when a site's tunnel
+  drops or an admin account gets locked out after repeated failed logins, so you don't
+  have to be watching the Log tab to find out. Off by default; a "Send Test Alert" button
+  confirms the URL works without waiting for a real event.
 
 ## Quick start (development)
 
