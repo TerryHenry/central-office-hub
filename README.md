@@ -13,7 +13,11 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
 ## What it does
 
 - **Reverse-tunnel site enrollment** -- an edge box connects out to this hub and
-  registers its ports; the hub never needs a route in.
+  registers its ports; the hub never needs a route in. The tunnel listener's own port
+  (System tab -- default `443`, so an edge site's outbound firewall almost never needs a
+  new rule for it) is admin-configurable, though changing it is a fleet-wide operation:
+  it only takes effect on the hub's next restart, and every enrolled site then needs its
+  own Tunnel Port updated to match before it can reconnect.
 - **Groups & console users** -- give a person access to exactly the ports they need,
   across any number of sites, without handing them an admin account.
 - **Enrollment tokens** -- generate a one-time token here, paste it into the edge box's

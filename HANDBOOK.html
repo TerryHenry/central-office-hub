@@ -608,6 +608,10 @@
         <p>The fingerprint a site should pin in its own Central Office panel, so its tunnel connection verifies it's really talking to this hub before trusting it.</p>
       </div>
       <div class="card">
+        <h4>Tunnel / SSH Listener</h4>
+        <p>The one port every enrolled site's tunnel connects to (and an admin-tunnel SSH session uses too) &mdash; default <code>443</code>, changeable here if this network needs something else. Saving only persists the new value; it takes effect on the next restart (TLS Certificate panel's <strong>Restart Service Now</strong>, or any other restart). Once that happens, every currently-connected site's tunnel drops immediately, and each one needs its own Central Office panel's Tunnel Port updated to match before it can reconnect &mdash; this is a fleet-wide change, not a hub-only setting, so treat it as a coordinated migration rather than a quick toggle.</p>
+      </div>
+      <div class="card">
         <h4 id="high-availability-inner">High Availability</h4>
         <p>Configures and shows the status of the standalone <code>ha-agent</code> process on <em>this</em> node &mdash; see <a href="#high-availability">High availability</a> below for the full picture. In short: fill in this node's role, peer, and failover mode here and click <strong>Save Configuration</strong>; it writes the agent's config and applies most changes live, no restart needed.</p>
       </div>

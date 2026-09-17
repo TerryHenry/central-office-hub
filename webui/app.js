@@ -1627,6 +1627,28 @@ async function loadHostKeyFingerprint() {
   document.getElementById('hostKeyFingerprint').textContent = fingerprint;
 }
 
+// ---------- Tunnel/SSH listener settings ----------
+async function loadSshSettings() {
+  const ssh = await api.get('/api/ssh-settings');
+  document.getElementById('sshPort').value = ssh.port;
+}
+document.getElementById('saveSshSettingsBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('sshSettingsMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = '';
+  const port = Number(document.getElementById('sshPort').value);
+  if (!confirm(`Save port ${port} as the tunnel/SSH listener port? This only takes effect after the service restarts -- every currently-connected site will need its own Tunnel Port updated to match before it can reconnect.`)) {
+    return;
+  }
+  try {
+    await api.post('/api/ssh-settings', { port });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Saved -- restart the service (below) to apply it.';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
 // ---------- High availability ----------
 const HA_DEFAULTS = {
   enabled: false,
@@ -2668,6 +2690,7 @@ async function initApp() {
   await loadAdminsTable();
   await loadTotpStatus();
   await loadHostKeyFingerprint();
+  await loadSshSettings();
   await loadHaConfig();
   await loadHaStatus();
   await loadTlsInfo();

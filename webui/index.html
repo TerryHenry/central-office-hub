@@ -445,6 +445,20 @@
         <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
       </div>
 
+      <div class="panel">
+        <h2>Tunnel / SSH Listener</h2>
+        <p class="hint">The single port every enrolled site's tunnel connects to, and that an admin-tunnel SSH session also uses -- default <code>443</code> (chosen so an edge site's outbound firewall almost never needs a new rule for it), but changeable if this network needs something else.</p>
+        <div class="field-row">
+          <label for="sshPort">Listen Port</label>
+          <input type="number" id="sshPort" min="1" max="65535" style="width: 7em" />
+        </div>
+        <div class="field-row">
+          <button id="saveSshSettingsBtn">Save Settings</button>
+        </div>
+        <p class="hint"><strong>Takes effect only after a restart</strong> (the TLS Certificate panel's Restart Service Now, further down this tab) -- saving alone doesn't rebind the listener. Once it restarts, every currently-connected site's tunnel drops immediately and won't be able to reconnect until that site's own Central Office panel has its Tunnel Port updated to match this new value -- this is a fleet-wide change, not a hub-only one.</p>
+        <div class="auth-error" id="sshSettingsMsg"></div>
+      </div>
+
       <div class="panel" id="haPanel">
         <h2>High Availability</h2>
         <p class="hint">Configures the standalone <code>ha-agent</code> process on THIS node only -- the peer node needs its own matching configuration with role/host swapped. Saving writes <code>ha-agent/config.json</code> and, if the agent is already running here, tells it to reload live. A brand-new agent still needs its systemd service started once by hand -- see the README's "High Availability" section.</p>
