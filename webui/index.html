@@ -160,6 +160,7 @@
           <button id="addSiteBtn">+ Add Site</button>
           <button id="bulkQueueUpdateBtn">Upgrade Version for Selected</button>
           <button id="bulkSyncAdminsBtn" class="danger">Sync Admins for Selected</button>
+          <button id="bulkSyncUsersBtn">Sync Users for Selected</button>
           <button id="bulkTftpUploadBtn" class="secondary">Upload to TFTP for Selected</button>
           <button id="revealPortIdsBtn" class="secondary">Reveal Port IDs</button>
         </div>
@@ -224,6 +225,33 @@
         </div>
       </div>
 
+      <div class="panel">
+        <h2>Neighbor Discovery (LLDP / CDP / FDP)</h2>
+        <p class="hint">Runs <code>lldpd</code> so this host announces itself to, and learns from, the switch it is plugged into &mdash; showing which switch and port each interface connects to. Optional CDP (Cisco) and FDP (Foundry/Brocade) support lets it hear switches that don't speak LLDP.</p>
+        <div class="field-row">
+          <label for="lldpEnabled">Enable LLDP</label>
+          <input type="checkbox" id="lldpEnabled" />
+          <span class="status-pill" id="lldpStatusPill"><span class="dot"></span><span id="lldpStatusText">&mdash;</span></span>
+        </div>
+        <div class="field-row">
+          <label for="lldpCdp">Also listen for CDP</label>
+          <input type="checkbox" id="lldpCdp" />
+        </div>
+        <div class="field-row">
+          <label for="lldpFdp">Also listen for FDP</label>
+          <input type="checkbox" id="lldpFdp" />
+        </div>
+        <div class="field-row">
+          <button id="saveLldpBtn" class="primary">Apply</button>
+          <button id="refreshLldpBtn" class="secondary">Refresh Neighbors</button>
+          <span class="auth-error" id="lldpMsg"></span>
+        </div>
+        <table class="data-table" id="lldpNeighborsTable">
+          <thead><tr><th>Local Interface</th><th>Protocol</th><th>Neighbor</th><th>Neighbor Port</th><th>Mgmt IP</th><th>VLAN</th><th>Capabilities</th><th>Age</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="lldpNeighborsEmpty">No neighbors discovered yet.</p>
+      </div>
       <div class="panel">
         <h2>Static IP</h2>
         <p class="hint">Relies on NetworkManager (<code>nmcli</code>). If this host doesn't run NetworkManager (common on a minimal Debian/cloud VM), saving here will show a clear error instead of silently doing nothing.</p>
@@ -821,6 +849,33 @@
   </div>
 
   <!-- Add/edit user modal -->
+  <!-- Site neighbor discovery (LLDP/CDP/FDP) modal -->
+  <div class="modal-backdrop" id="siteLldpModalBackdrop">
+    <div class="modal" style="max-width: 960px; width: 96%;">
+      <h3>Neighbors: <span id="siteLldpSiteName"></span></h3>
+      <input type="hidden" id="siteLldpSiteId" />
+      <p class="hint" id="siteLldpState">Loading&hellip;</p>
+      <table class="data-table" id="siteLldpTable">
+        <thead><tr><th>Local Interface</th><th>Protocol</th><th>Neighbor</th><th>Neighbor Port</th><th>Mgmt IP</th><th>VLAN</th><th>Capabilities</th><th>Age</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint" id="siteLldpEmpty"></p>
+      <div class="field-row">
+        <label for="siteLldpEnabled">Enable LLDP</label>
+        <input type="checkbox" id="siteLldpEnabled" />
+        <label for="siteLldpCdp" style="margin-left:16px;">CDP</label>
+        <input type="checkbox" id="siteLldpCdp" />
+        <label for="siteLldpFdp" style="margin-left:16px;">FDP</label>
+        <input type="checkbox" id="siteLldpFdp" />
+      </div>
+      <span class="auth-error" id="siteLldpError"></span>
+      <div class="modal-actions">
+        <button id="closeSiteLldpBtn" class="secondary">Close</button>
+        <button id="refreshSiteLldpBtn" class="secondary">Refresh</button>
+        <button id="applySiteLldpBtn" class="primary">Queue Settings</button>
+      </div>
+    </div>
+  </div>
   <div class="modal-backdrop" id="userModalBackdrop">
     <div class="modal">
       <h3 id="userModalTitle">Add User</h3>
@@ -842,6 +897,18 @@
         <label for="userCaptureEnabled">Capture this user's sessions</label>
         <input type="checkbox" id="userCaptureEnabled" />
         <span class="hint">Always logs their sessions to file, on any site/port. Off by default.</span>
+      </div>
+      <div class="field-row column">
+        <label>Push to edge sites <span class="hint">(optional)</span></label>
+        <div id="userEdgeSiteChecks" class="check-list"></div>
+        <span class="hint">Also creates this account as a local login on each checked site's own SSH/web console (the same password), on its next heartbeat. Sites this user reaches through a group grant can also be synced anytime from the Sites tab.</span>
+      </div>
+      <div class="field-row">
+        <label for="userEdgePermission">Access on pushed sites</label>
+        <select id="userEdgePermission">
+          <option value="read-write">Read / write</option>
+          <option value="read-only">Read-only</option>
+        </select>
       </div>
       <input type="hidden" id="userEditId" />
       <div class="modal-actions">

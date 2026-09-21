@@ -50,6 +50,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# lldpd powers the Network tab's neighbor discovery (LLDP, plus optional CDP/FDP). Not
+# fatal if it can't install -- the tab just reports that lldpd is missing. Installing
+# starts it with LLDP on, which is the intended default; it can be turned off from the UI.
+echo "==> Installing lldpd for neighbor discovery..."
+retry apt-get install -y --no-install-recommends lldpd
+if [ $? -ne 0 ]; then
+  echo "WARNING: failed to install lldpd -- Network tab neighbor discovery won't work" >&2
+fi
 # NetworkManager (nmcli) isn't part of a minimal Debian genericcloud image, but the
 # Network tab's DNS/static-IP settings depend on it -- install it and hand this box's
 # interface(s) over to it now, rather than leaving that as a manual step an admin has to

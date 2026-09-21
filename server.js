@@ -14,6 +14,14 @@ const { createWebServer } = require('./lib/webServer');
 
 logStore.init(configStore.DATA_DIR);
 
+// Existing installs predate lldpd support -- fetch it in the background if it's missing.
+require('./lib/lldp')
+  .ensureInstalled()
+  .then((s) => {
+    if (!s.installed && process.platform === 'linux') console.log('lldpd is not installed and could not be installed automatically');
+  })
+  .catch((err) => console.log('automatic lldpd install failed: ' + err.message));
+
 const hostKey = ensureHostKey(configStore.DATA_DIR);
 const tlsCertPair = ensureTlsCert(configStore.DATA_DIR);
 

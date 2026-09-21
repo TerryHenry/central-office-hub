@@ -548,7 +548,7 @@ async function loadSites() {
           .map((p) => {
             const dotClass = p.present === true ? 'online' : p.present === false ? 'offline' : 'unknown';
             const title = p.present === true ? 'Device present' : p.present === false ? 'Device not present' : 'Presence unknown';
-            return `<div><span class="topology-dot ${dotClass}" title="${title}"></span>${escapeHtml(p.label)} ${accessPill(p.access)}<code class="port-id">${escapeHtml(p.id)}</code></div>`;
+            return `<div><span class="topology-dot ${dotClass}" title="${title}"></span>${escapeHtml(p.label)} ${accessPill(p.access)}<code class="port-id">${escapeHtml(p.id)}</code> <button class="danger site-port-delete" data-port-id="${escapeHtml(p.id)}" title="Delete this port" style="padding:1px 8px; font-size:11px;">Delete</button></div>`;
           })
           .join('')
       : '<span class="hint">none reported yet</span>';
@@ -573,6 +573,12 @@ async function loadSites() {
       <td>${portsList}</td>
       <td></td>
     `;
+    tr.querySelectorAll('.site-port-delete').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const port = site.ports.find((p) => p.id === btn.dataset.portId);
+        if (port) openDeletePortModal(site.id, port.id, port.label);
+      });
+    });
     const actionsCell = tr.lastElementChild;
     const menuItems = [
       { label: 'Rename', onClick: () => openSiteRenameModal(site) },
@@ -618,6 +624,7 @@ async function loadSites() {
     menuItems.push('divider');
     menuItems.push({ label: 'Configure Ports', onClick: () => openSitePortsModal(site) });
     menuItems.push({ label: 'Local Access', onClick: () => openSiteLocalAccessModal(site) });
+    menuItems.push({ label: 'Neighbors (LLDP)', onClick: () => openSiteLldpModal(site) });
     menuItems.push({ label: 'TFTP Server', onClick: () => openSiteTftpSettingsModal(site) });
     menuItems.push('divider');
     menuItems.push({
@@ -627,6 +634,14 @@ async function loadSites() {
         if (!confirm(`Replace every local admin account on "${site.name}" with this hub's own admin accounts? Any admin login not from the hub will stop working on that box. Applies on its next heartbeat.`)) return;
         await api.post(`/api/sites/${site.id}/sync-admins`);
         alert(`An admin sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
+      }
+    });
+    menuItems.push({
+      label: 'Sync Users',
+      onClick: async () => {
+        if (!confirm(`Push this hub's console users who have access to "${site.name}" (via group grants or an explicit push) to that box as local logins? It replaces only hub-managed logins there -- accounts created locally on the box are left alone. Applies on its next heartbeat.`)) return;
+        await api.post(`/api/sites/${site.id}/sync-users`);
+        alert(`A user sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
       }
     });
     menuItems.push({
@@ -676,6 +691,17 @@ document.getElementById('bulkSyncAdminsBtn').addEventListener('click', async () 
   if (!confirm(`Replace every local admin account on ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} with this hub's own admin accounts? Any admin login not from the hub will stop working on those boxes. Each applies on its own next heartbeat.`)) return;
   const result = await api.post('/api/sites/sync-admins/bulk', { siteIds });
   alert(`Queued an admin sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+});
+
+document.getElementById('bulkSyncUsersBtn').addEventListener('click', async () => {
+  const siteIds = Array.from(document.querySelectorAll('#sitesTable .site-select:checked')).map((cb) => cb.dataset.site);
+  if (siteIds.length === 0) {
+    alert('Select at least one site first.');
+    return;
+  }
+  if (!confirm(`Push this hub's console users to ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} as local logins? Each site gets only the users who have access to it, and only hub-managed logins there are replaced. Each applies on its own next heartbeat.`)) return;
+  const result = await api.post('/api/sites/sync-users/bulk', { siteIds });
+  alert(`Queued a user sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
 });
 
 document.getElementById('bulkTftpUploadBtn').addEventListener('click', () => {
@@ -857,13 +883,20 @@ document.getElementById('scanSiteDevicesBtn').addEventListener('click', async ()
   resultsEl.innerHTML = '<p class="hint">Scanning the site for available devices&hellip;</p>';
   try {
     const { ports } = await api.get(`/api/sites/${siteId}/devices`);
-    if (!ports.length) {
-      resultsEl.innerHTML = '<p class="hint">No devices found on that site.</p>';
+    // Devices already in the table (existing ports, or ones just staged with + Add) aren't
+    // offered again -- they're already assigned.
+    const assignedPaths = () =>
+      new Set([...document.querySelectorAll('#sitePortsTable .site-port-path')].map((el) => el.value.trim()));
+    const available = ports.filter((dev) => !assignedPaths().has(dev.path));
+    if (!available.length) {
+      resultsEl.innerHTML = `<p class="hint">${
+        ports.length ? 'Every device on that site is already assigned to a port.' : 'No devices found on that site.'
+      }</p>`;
       return;
     }
     const list = document.createElement('div');
     list.className = 'check-list';
-    for (const dev of ports) {
+    for (const dev of available) {
       const detail = [dev.manufacturer, dev.serialNumber].filter(Boolean).join(' · ');
       const row = document.createElement('div');
       row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:8px;';
@@ -873,6 +906,8 @@ document.getElementById('scanSiteDevicesBtn').addEventListener('click', async ()
       `;
       row.querySelector('.add-scanned-device-btn').addEventListener('click', () => {
         addSitePortRow({ label: dev.manufacturer || dev.path, path: dev.path, baudRate: 9600, access: 'exclusive', captureEnabled: false });
+        row.remove();
+        if (!list.children.length) resultsEl.innerHTML = '<p class="hint">Every device on that site is now assigned.</p>';
       });
       list.appendChild(row);
     }
@@ -917,6 +952,57 @@ document.getElementById('saveSitePortsBtn').addEventListener('click', async () =
   }
 });
 
+// ---------- Site neighbor discovery (live over the tunnel; settings queued) ----------
+async function loadSiteLldp() {
+  const siteId = document.getElementById('siteLldpSiteId').value;
+  const stateEl = document.getElementById('siteLldpState');
+  const errEl = document.getElementById('siteLldpError');
+  const emptyEl = document.getElementById('siteLldpEmpty');
+  errEl.textContent = '';
+  emptyEl.textContent = '';
+  stateEl.textContent = 'Asking the site…';
+  const tbody = document.querySelector('#siteLldpTable tbody');
+  tbody.innerHTML = '';
+  try {
+    const data = await api.get(`/api/sites/${siteId}/lldp`);
+    stateEl.textContent = !data.installed ? 'lldpd is not installed on this site (sudo apt-get install lldpd).' : data.active ? 'Neighbor discovery is running on this site.' : 'Neighbor discovery is not running on this site.';
+    document.getElementById('siteLldpEnabled').checked = !!data.active;
+    document.getElementById('siteLldpCdp').checked = !!data.cdp;
+    document.getElementById('siteLldpFdp').checked = !!data.fdp;
+    renderLldpNeighborRows(tbody, data.neighbors || []);
+    if (data.neighborsError) errEl.textContent = data.neighborsError;
+    else if (data.active && !(data.neighbors || []).length) emptyEl.textContent = 'No neighbors discovered yet -- switches usually announce every 30 seconds.';
+  } catch (err) {
+    stateEl.textContent = '';
+    errEl.textContent = err.message;
+  }
+}
+
+function openSiteLldpModal(site) {
+  document.getElementById('siteLldpSiteId').value = site.id;
+  document.getElementById('siteLldpSiteName').textContent = site.name;
+  document.getElementById('siteLldpModalBackdrop').classList.add('open');
+  loadSiteLldp();
+}
+document.getElementById('closeSiteLldpBtn').addEventListener('click', () => {
+  document.getElementById('siteLldpModalBackdrop').classList.remove('open');
+});
+document.getElementById('refreshSiteLldpBtn').addEventListener('click', () => loadSiteLldp());
+document.getElementById('applySiteLldpBtn').addEventListener('click', async () => {
+  const siteId = document.getElementById('siteLldpSiteId').value;
+  const errEl = document.getElementById('siteLldpError');
+  errEl.textContent = '';
+  try {
+    await api.post(`/api/sites/${siteId}/lldp`, {
+      enabled: document.getElementById('siteLldpEnabled').checked,
+      cdp: document.getElementById('siteLldpCdp').checked,
+      fdp: document.getElementById('siteLldpFdp').checked
+    });
+    alert('Neighbor-discovery settings queued -- they apply on the box\'s next heartbeat.');
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
 // ---------- Local access (hub-pushed, applied on the site's next heartbeat) ----------
 function openSiteLocalAccessModal(site) {
   document.getElementById('siteLocalAccessSiteId').value = site.id;
@@ -1206,7 +1292,7 @@ async function loadUsers() {
   }
 }
 
-function openUserModal(user) {
+async function openUserModal(user) {
   document.getElementById('userModalTitle').textContent = user ? 'Edit User' : 'Add User';
   document.getElementById('userEditId').value = user ? user.id : '';
   document.getElementById('userUsername').value = user ? user.username : '';
@@ -1232,6 +1318,26 @@ function openUserModal(user) {
     label.appendChild(document.createTextNode(group.name));
     checksEl.appendChild(label);
   }
+
+  document.getElementById('userEdgePermission').value = (user && user.edgePermission) || 'read-write';
+  const edgeChecksEl = document.getElementById('userEdgeSiteChecks');
+  edgeChecksEl.innerHTML = '';
+  try {
+    const sites = await api.get('/api/sites');
+    if (sites.length === 0) edgeChecksEl.innerHTML = '<span class="hint">No sites enrolled yet.</span>';
+    for (const site of sites) {
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = site.id;
+      checkbox.checked = !!(user && (user.edgeSiteIds || []).includes(site.id));
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(site.name));
+      edgeChecksEl.appendChild(label);
+    }
+  } catch {
+    edgeChecksEl.innerHTML = '<span class="hint">Could not load sites.</span>';
+  }
   document.getElementById('userModalBackdrop').classList.add('open');
 }
 
@@ -1245,16 +1351,18 @@ document.getElementById('saveUserBtn').addEventListener('click', async () => {
   const password = document.getElementById('userPassword').value;
   const groupIds = Array.from(document.querySelectorAll('#userGroupChecks input:checked')).map((c) => c.value);
   const captureEnabled = document.getElementById('userCaptureEnabled').checked;
+  const edgeSiteIds = Array.from(document.querySelectorAll('#userEdgeSiteChecks input:checked')).map((c) => c.value);
+  const edgePermission = document.getElementById('userEdgePermission').value;
   let valid = true;
   if (!username) { setFieldError('userUsername', 'A username is required.'); valid = false; }
   if (!id && !password) { setFieldError('userPassword', 'A password is required.'); valid = false; }
   if (!valid) return;
   try {
     if (id) {
-      await api.post(`/api/users/${id}`, { username, groupIds, captureEnabled });
+      await api.post(`/api/users/${id}`, { username, groupIds, captureEnabled, edgeSiteIds, edgePermission });
       if (password) await api.post(`/api/users/${id}/password`, { password });
     } else {
-      await api.post('/api/users', { username, password, groupIds, captureEnabled });
+      await api.post('/api/users', { username, password, groupIds, captureEnabled, edgeSiteIds, edgePermission });
     }
     document.getElementById('userModalBackdrop').classList.remove('open');
     await loadUsers();
@@ -2339,9 +2447,71 @@ async function loadNetwork() {
   setTimezoneUi(data.timezone);
   populateStaticIpDevices(data.interfaces);
   await loadStaticIpConfig();
+  loadLldp().catch((err) => {
+    document.getElementById('lldpMsg').textContent = err.message;
+  });
 }
 
 document.getElementById('refreshNetworkBtn').addEventListener('click', () => loadNetwork());
+// ---------- Neighbor discovery (LLDP / CDP / FDP) ----------
+function renderLldpNeighborRows(tbody, neighbors) {
+  tbody.innerHTML = '';
+  for (const n of neighbors) {
+    const tr = document.createElement('tr');
+    const neighborLabel = n.chassisName || n.chassisId || '';
+    const neighborTitle = [n.description, n.chassisId && n.chassisName ? `Chassis ID: ${n.chassisId}` : ''].filter(Boolean).join('\n');
+    tr.innerHTML = `
+      <td>${escapeHtml(n.localInterface || '')}</td>
+      <td>${escapeHtml(n.protocol || '')}</td>
+      <td title="${escapeHtml(neighborTitle)}">${escapeHtml(neighborLabel)}</td>
+      <td title="${escapeHtml(n.portDescription || '')}">${escapeHtml(n.portId || '')}</td>
+      <td>${n.managementIps.length ? n.managementIps.map(escapeHtml).join('<br>') : '<span class="hint">&mdash;</span>'}</td>
+      <td>${escapeHtml(n.vlan || '')}</td>
+      <td>${escapeHtml((n.capabilities || []).join(', '))}</td>
+      <td>${escapeHtml(n.age || '')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function applyLldpStatus(data) {
+  document.getElementById('lldpEnabled').checked = !!data.active;
+  document.getElementById('lldpCdp').checked = !!data.cdp;
+  document.getElementById('lldpFdp').checked = !!data.fdp;
+  const pill = document.getElementById('lldpStatusPill');
+  pill.classList.toggle('running', !!data.active);
+  document.getElementById('lldpStatusText').textContent = !data.installed ? 'lldpd not installed' : data.active ? 'Running' : 'Stopped';
+  const msg = document.getElementById('lldpMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = !data.installed ? 'lldpd is not installed on this host (sudo apt-get install lldpd).' : data.neighborsError || '';
+  const neighbors = data.neighbors || [];
+  renderLldpNeighborRows(document.querySelector('#lldpNeighborsTable tbody'), neighbors);
+  const empty = document.getElementById('lldpNeighborsEmpty');
+  empty.style.display = neighbors.length ? 'none' : '';
+  empty.textContent = data.active ? 'No neighbors discovered yet -- switches usually announce every 30 seconds.' : 'Neighbor discovery is not running.';
+}
+
+async function loadLldp() {
+  applyLldpStatus(await api.get('/api/lldp'));
+}
+
+document.getElementById('refreshLldpBtn').addEventListener('click', () => loadLldp().catch((err) => (document.getElementById('lldpMsg').textContent = err.message)));
+document.getElementById('saveLldpBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('lldpMsg');
+  msg.textContent = '';
+  try {
+    applyLldpStatus(
+      await api.post('/api/lldp', {
+        enabled: document.getElementById('lldpEnabled').checked,
+        cdp: document.getElementById('lldpCdp').checked,
+        fdp: document.getElementById('lldpFdp').checked
+      })
+    );
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
 
 document.getElementById('saveStaticIpBtn').addEventListener('click', async () => {
   const device = document.getElementById('staticIpDevice').value;

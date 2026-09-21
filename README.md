@@ -55,6 +55,24 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   have to be watching the Log tab to find out. Off by default; a "Send Test Alert" button
   confirms the URL works without waiting for a real event.
 
+- **User push and Sync Users** -- adding or editing a console user offers "Push to edge
+  sites": the account is also created as a local SSH/web-console login on each checked
+  site (same password, read/write or read-only), on its next heartbeat. **Sync Users**
+  (per site, or for the selected sites) pushes every hub user who has access to that
+  site -- via a group grant, or an explicit push -- and replaces only *hub-managed*
+  logins there; accounts created locally on the box are never touched. Unlike admin
+  sync, users are not pushed everywhere by default, since an edge box's logins can reach
+  all of its ports.
+- **Neighbor discovery (LLDP / CDP / FDP)** -- the Network tab shows what switch and port
+  this host is plugged into, via `lldpd`, with optional CDP and FDP listening. Each
+  site's row menu has **Neighbors (LLDP)**, which asks the site live over its tunnel
+  and can queue an enable/disable for it. Needs `lldpd`: installed on new builds, and fetched automatically (via the
+  privileged helper, needs internet) the first time an existing host starts this version.
+- **Streamed TFTP push** -- files pushed to sites are spooled to disk and streamed with
+  backpressure (at most three sites at a time), and the hub's own TFTP server negotiates
+  block size and window size (RFC 2347/2348/2349/7440) and streams from disk, which is
+  what makes large downloads fast.
+
 ## Quick start (development)
 
 ```bash

@@ -12,6 +12,55 @@ NTP_DROPIN_DIR=/etc/systemd/timesyncd.conf.d
 NTP_DROPIN_FILE="$NTP_DROPIN_DIR/50-central-office.conf"
 
 case "${1:-}" in
+  lldp-install)
+    # Fixed package name only. Idempotent: does nothing if lldpd is already present.
+    if command -v lldpd >/dev/null 2>&1; then echo "already installed"; exit 0; fi
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y --no-install-recommends lldpd
+    ;;  lldp-status)
+    # Read-only: reports whether lldpd is installed/running and which discovery protocols
+    # it is configured to speak, as key=value lines the app parses.
+    installed=0; command -v lldpd >/dev/null 2>&1 && installed=1
+    active=0; systemctl is-active --quiet lldpd 2>/dev/null && active=1
+    args=""
+    if [ -f /etc/default/lldpd ]; then
+      args="$(sed -n 's/^DAEMON_ARGS="\(.*\)"$/\1/p' /etc/default/lldpd | head -1)"
+    fi
+    cdp=0; fdp=0
+    case " $args " in *" -c "*) cdp=1 ;; esac
+    case " $args " in *" -f "*) fdp=1 ;; esac
+    echo "installed=$installed"
+    echo "active=$active"
+    echo "cdp=$cdp"
+    echo "fdp=$fdp"
+    ;;
+  lldp-set)
+    # lldp-set <enabled 0|1> <cdp 0|1> <fdp 0|1>. Fixed flags only -- nothing the caller
+    # supplies is ever written into the daemon's argument line except these validated
+    # switches, since this script is the actual privilege boundary.
+    enabled="${2:?enabled flag required}"
+    cdp="${3:?cdp flag required}"
+    fdp="${4:?fdp flag required}"
+    for v in "$enabled" "$cdp" "$fdp"; do
+      case "$v" in 0|1) ;; *) echo "flags must be 0 or 1" >&2; exit 1 ;; esac
+    done
+    command -v lldpd >/dev/null 2>&1 || { echo "lldpd is not installed -- install it with: sudo apt-get install lldpd" >&2; exit 1; }
+    daemon_args=""
+    [ "$cdp" = "1" ] && daemon_args="$daemon_args -c"
+    [ "$fdp" = "1" ] && daemon_args="$daemon_args -f"
+    daemon_args="${daemon_args# }"
+    printf '# Managed by the terminal server admin UI.\nDAEMON_ARGS="%s"\n' "$daemon_args" > /etc/default/lldpd
+    if [ "$enabled" = "1" ]; then
+      systemctl enable lldpd >/dev/null 2>&1 || true
+      systemctl restart lldpd
+    else
+      systemctl disable --now lldpd >/dev/null 2>&1 || true
+    fi
+    ;;
+  lldp-neighbors)
+    exec lldpcli -f json0 show neighbors details
+    ;;
   service-restart)
     # Takes no arguments -- the app can only ever restart itself, never target an
     # arbitrary unit.
@@ -104,7 +153,7 @@ case "${1:-}" in
     # one, so there's nothing to keep in sync with the hostname change.
     ;;
   *)
-    echo "usage: system-helper.sh {service-restart|ntp-set <server>|timezone-set <tz>|dns-set <servers...>|dns-clear|ip-set <conn> <addr> <prefix> <gw>|ip-clear <conn>|hostname-set <name>}" >&2
+    echo "usage: system-helper.sh {lldp-install|lldp-status|lldp-set <en> <cdp> <fdp>|lldp-neighbors|service-restart|ntp-set <server>|timezone-set <tz>|dns-set <servers...>|dns-clear|ip-set <conn> <addr> <prefix> <gw>|ip-clear <conn>|hostname-set <name>}" >&2
     exit 1
     ;;
 esac
