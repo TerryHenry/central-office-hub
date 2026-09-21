@@ -1,12 +1,14 @@
 'use strict';
 
-// Batch tab: write a script, pick ports across any number of sites, run it, and watch a
-// per-device record of what happened. The work itself happens on the hub (lib/batchRunner.js).
+// Batch tab: write a script, pick ports (on the hub: across any number of sites; on an edge
+// box: its own ports), run it, and watch a per-device record of what happened. The work
+// itself happens server-side (lib/batchRunner.js). This file is shared by both apps.
 (function batchUi() {
   const tabBtn = document.querySelector('[data-tab="batch"]');
   const tab = document.getElementById('tab-batch');
   if (!tabBtn || !tab) return;
 
+  const IS_HUB = !!document.querySelector('[data-tab="sites"]');
   const $ = (id) => document.getElementById(id);
   const esc = (s) => escapeHtml(s == null ? '' : s);
 
@@ -110,7 +112,44 @@
   });
 
   // ---------- Port picker ----------
+  // On an edge box the only "site" is itself: its own serial ports, keyed "local:<portId>".
+  async function loadLocalTargets() {
+    const ports = (await api.get('/api/ports')).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
+    const wrap = $('batchTargets');
+    wrap.innerHTML = '';
+    if (!ports.length) {
+      wrap.innerHTML = '<p class="hint">No serial ports are configured on this box yet.</p>';
+      updateSelectedCount();
+      return;
+    }
+    const block = document.createElement('div');
+    block.className = 'batch-site';
+    block.innerHTML = '<label class="batch-site-head"><input type="checkbox" class="batch-site-all" /> <strong>This box</strong></label><div class="batch-ports"></div>';
+    const portsEl = block.querySelector('.batch-ports');
+    for (const port of ports) {
+      const key = `local:${port.id}`;
+      const label = document.createElement('label');
+      label.className = 'batch-port';
+      label.innerHTML = `<input type="checkbox" ${selectedPorts.has(key) ? 'checked' : ''} /> ${esc(port.label)}`;
+      label.querySelector('input').addEventListener('change', (e) => {
+        if (e.target.checked) selectedPorts.add(key);
+        else selectedPorts.delete(key);
+        updateSelectedCount();
+      });
+      portsEl.appendChild(label);
+    }
+    block.querySelector('.batch-site-all').addEventListener('change', (e) => {
+      block.querySelectorAll('.batch-port input').forEach((cb) => {
+        cb.checked = e.target.checked;
+        cb.dispatchEvent(new Event('change'));
+      });
+    });
+    wrap.appendChild(block);
+    updateSelectedCount();
+  }
+
   async function loadTargets() {
+    if (!IS_HUB) return loadLocalTargets();
     const sites = await api.get('/api/sites');
     const wrap = $('batchTargets');
     wrap.innerHTML = '';
