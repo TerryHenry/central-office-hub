@@ -38,6 +38,11 @@
   );
   addWidget('recent-activity', 'Recent Activity', '<pre class="log-tail" id="dashRecentLog">Loading&hellip;</pre>');
 
+  // Default order puts System Information last, below the widgets added above (a saved layout,
+  // if the admin has customized one, still wins -- see currentOrder()).
+  const sysInfo = [...tab.querySelectorAll(':scope > .panel')].find((p) => ((p.querySelector('h2') || {}).textContent || '').trim() === 'System Information');
+  if (sysInfo) tab.appendChild(sysInfo);
+
   // ---------- Identify widgets and stat cards ----------
   const panels = [...tab.querySelectorAll(':scope > .panel')];
   const widgets = panels.map((panel) => {
