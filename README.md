@@ -62,9 +62,7 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   site -- via a group grant, or an explicit push -- and replaces only *hub-managed*
   logins there; accounts created locally on the box are never touched. Unlike admin
   sync, users are not pushed everywhere by default, since an edge box's logins can reach
-  all of its ports -- the Sync Users dialog offers **Every hub user** for the admin-style
-  behavior, remembered per site so later user changes keep it in step, and warns when a
-  sync matched nobody.
+  all of its ports.
 - **Neighbor discovery (LLDP / CDP / FDP)** -- the Network tab shows what switch and port
   this host is plugged into, via `lldpd`, with optional CDP and FDP listening. Each
   site's row menu has **Neighbors (LLDP)**, which asks the site live over its tunnel
