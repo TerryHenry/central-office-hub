@@ -12,9 +12,9 @@
     <form class="auth-card" id="loginForm">
       <h1>Central Office</h1>
       <label>Username</label>
-      <input type="text" id="loginUsername" required />
+      <input type="text" id="loginUsername" required autocomplete="username" />
       <label>Password</label>
-      <input type="password" id="loginPassword" required />
+      <input type="password" id="loginPassword" required autocomplete="current-password" />
       <div class="auth-error" id="loginError"></div>
       <button type="submit" class="primary">Sign In</button>
     </form>
@@ -38,9 +38,9 @@
       <h1>Change the default password</h1>
       <p class="hint">This account is still using the default password. Choose a new one to continue.</p>
       <label>New password <span class="hint" id="forceChangePasswordHint"></span></label>
-      <input type="password" id="forceChangePassword" minlength="8" required />
+      <input type="password" id="forceChangePassword" minlength="8" required autocomplete="new-password" />
       <label>Confirm password</label>
-      <input type="password" id="forceChangePasswordConfirm" minlength="8" required />
+      <input type="password" id="forceChangePasswordConfirm" minlength="8" required autocomplete="new-password" />
       <div class="auth-error" id="forceChangeError"></div>
       <button type="submit" class="primary">Set Password &amp; Continue</button>
     </form>
@@ -780,11 +780,11 @@
         <p class="hint">Signed in as <strong id="myUsername">&mdash;</strong>.</p>
         <div class="field-row column">
           <label for="newAdminPassword">New password <span class="hint" id="newAdminPasswordHint"></span></label>
-          <input type="password" id="newAdminPassword" minlength="8" />
+          <input type="password" id="newAdminPassword" minlength="8" autocomplete="new-password" />
         </div>
         <div class="field-row column">
           <label for="newAdminPasswordConfirm">Confirm new password</label>
-          <input type="password" id="newAdminPasswordConfirm" minlength="8" />
+          <input type="password" id="newAdminPasswordConfirm" minlength="8" autocomplete="new-password" />
         </div>
         <div class="field-row">
           <button id="changeAdminPasswordBtn">Change Password</button>
@@ -989,12 +989,12 @@
       <h3 id="userModalTitle">Add User</h3>
       <div class="field-row column">
         <label for="userUsername">Username</label>
-        <input type="text" id="userUsername" />
+        <input type="text" id="userUsername" autocomplete="off" />
         <span class="field-error" id="userUsernameError"></span>
       </div>
       <div class="field-row column" id="userPasswordRow">
         <label for="userPassword">Password <span class="hint" id="userPasswordHint"></span></label>
-        <input type="password" id="userPassword" />
+        <input type="password" id="userPassword" autocomplete="new-password" />
         <span class="field-error" id="userPasswordError"></span>
       </div>
       <div class="field-row column">
@@ -1166,14 +1166,14 @@
       <h3 id="adminModalTitle">Add Admin</h3>
       <div class="field-row column">
         <label for="adminUsername">Username</label>
-        <input type="text" id="adminUsername" />
+        <input type="text" id="adminUsername" autocomplete="off" />
         <span class="field-error" id="adminUsernameError"></span>
       </div>
       <div class="field-row column">
         <label for="adminPassword">Password <span class="hint" id="adminPasswordHint">(leave blank to keep existing)</span></label>
-        <input type="password" id="adminPassword" minlength="8" />
+        <input type="password" id="adminPassword" minlength="8" autocomplete="new-password" />
         <label for="adminPasswordConfirm">Confirm password</label>
-        <input type="password" id="adminPasswordConfirm" minlength="8" />
+        <input type="password" id="adminPasswordConfirm" minlength="8" autocomplete="new-password" />
         <span class="field-error" id="adminPasswordError"></span>
       </div>
       <input type="hidden" id="adminId" />

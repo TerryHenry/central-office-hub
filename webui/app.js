@@ -3075,3 +3075,15 @@ document.getElementById('saveLogMaxBtn').addEventListener('click', async () => {
     msg.textContent = err.message;
   }
 });
+
+// ---------- Release focus when a focused control is hidden ----------
+// Chrome can leave its password/autofill popup floating mid-screen when the field it belongs
+// to is hidden while still focused (the login screen giving way to the app, a modal closing).
+// Blur the focused control as soon as it stops being displayed so the popup goes with it.
+(function releaseFocusOnHide() {
+  const check = () => {
+    const el = document.activeElement;
+    if (el && el !== document.body && el.offsetParent === null && getComputedStyle(el).position !== 'fixed') el.blur();
+  };
+  new MutationObserver(check).observe(document.body, { attributes: true, attributeFilter: ['class', 'style', 'hidden'], subtree: true });
+})();
