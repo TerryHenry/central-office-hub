@@ -71,7 +71,6 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="sites">Sites</button>
-      <button class="tab-btn" data-tab="forwards">Forwards</button>
       <button class="tab-btn" data-tab="users">Users</button>
       <button class="tab-btn" data-tab="groups">Groups</button>
       <button class="tab-btn" data-tab="network">Network</button>
@@ -390,31 +389,6 @@
       </div>
     </div>
 
-    <div class="tab-content" id="tab-forwards">
-      <div class="panel">
-        <h2>Forwards</h2>
-        <p class="hint">Reach a device on a site's own network &mdash; a switch's web page, an SSH login, anything that speaks TCP &mdash; from your computer, through that site's existing tunnel to this hub. Name the device and its port here, then use <strong>Connect</strong> to get the one-line command to run.</p>
-        <table class="data-table" id="forwardsTable">
-          <thead><tr><th>Name</th><th>Site</th><th>Device</th><th>Notes</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <p class="hint" id="forwardsEmpty">No forwards yet.</p>
-        <div class="field-row">
-          <button id="addForwardBtn">+ Add Forward</button>
-          <button id="forwardsAllBtn" class="secondary" style="display:none;">Command for all forwards</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>How it works</h2>
-        <ul class="hint">
-          <li>You run the command on your own computer with a normal SSH client. It signs in to this hub as an <strong>admin</strong> (with your two-factor code, if you have one set up) and opens a local port that leads to the device.</li>
-          <li>The connection only exists while that command is running &mdash; press Ctrl-C to close it. Nothing new is opened on the hub or at the site.</li>
-          <li>Only devices named here can be reached, and only on the port set for them. Console users can't use forwards.</li>
-          <li>Every connection and every refusal is written to the Log. A site can also refuse them entirely (Central Office panel on the site, <em>Allow hub forwarding</em>).</li>
-        </ul>
-      </div>
-    </div>
     <div class="tab-content" id="tab-batch">
       <div class="panel">
         <h2>Run a Batch</h2>
@@ -951,51 +925,6 @@
   </div>
 
   <!-- Add/edit user modal -->
-  <!-- Forward editor -->
-  <div class="modal-backdrop" id="forwardEditBackdrop">
-    <div class="modal">
-      <h3 id="forwardEditTitle">Add Forward</h3>
-      <input type="hidden" id="forwardId" />
-      <div class="field-row column">
-        <label for="forwardName">Name</label>
-        <input type="text" id="forwardName" placeholder="e.g. bldg3-switch" autocomplete="off" />
-        <span class="hint">Letters, digits, dots, dashes. This is what you type in the SSH command.</span>
-      </div>
-      <div class="field-row column">
-        <label for="forwardSite">Site</label>
-        <select id="forwardSite"></select>
-      </div>
-      <div class="field-row">
-        <label for="forwardHost">Device address</label>
-        <input type="text" id="forwardHost" placeholder="192.168.1.20" autocomplete="off" style="width: 14em" />
-        <label for="forwardPort">Port</label>
-        <input type="number" id="forwardPort" min="1" max="65535" style="width: 6em" />
-      </div>
-      <div class="field-row column">
-        <label for="forwardNotes">Notes <span class="hint">(optional)</span></label>
-        <input type="text" id="forwardNotes" maxlength="200" autocomplete="off" />
-      </div>
-      <span class="auth-error" id="forwardEditError"></span>
-      <div class="modal-actions">
-        <button id="cancelForwardBtn" class="secondary">Cancel</button>
-        <button id="saveForwardBtn" class="primary">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Forward connect command -->
-  <div class="modal-backdrop" id="forwardConnectBackdrop">
-    <div class="modal" style="max-width: 760px; width: 96%;">
-      <h3>Connect</h3>
-      <p class="hint">Run this on your own computer. Leave it running while you use the connection; press Ctrl-C to close it.</p>
-      <pre class="code-block" id="forwardCommand" style="white-space: pre-wrap; word-break: break-all;"></pre>
-      <ul class="hint" id="forwardHints"></ul>
-      <div class="modal-actions">
-        <button id="closeForwardConnectBtn" class="secondary">Close</button>
-        <button id="forwardCopyBtn" class="primary">Copy command</button>
-      </div>
-    </div>
-  </div>
   <!-- Batch run detail -->
   <div class="modal-backdrop" id="batchDetailBackdrop">
     <div class="modal" style="max-width: 980px; width: 96%; max-height: 90vh; overflow-y: auto;">
@@ -1309,6 +1238,5 @@
   <script src="app.js"></script>
   <script src="dashboard.js"></script>
   <script src="batch.js"></script>
-  <script src="forwards.js"></script>
 </body>
 </html>
