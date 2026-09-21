@@ -73,6 +73,23 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   block size and window size (RFC 2347/2348/2349/7440) and streams from disk, which is
   what makes large downloads fast.
 
+- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
+  Topology, System Information, plus Fleet Summary, Active Sessions and Recent Activity).
+  **Customize** lets you hide, show and reorder them, and toggle individual System stat
+  cards. The layout is stored in the browser, so it is per-browser, not per-account.
+  Clicking a connected site's port in the Fleet Topology opens that port's web console
+  in a new tab.
+- **Web console picker** -- drills down site -> port (a single-site user goes straight to
+  the ports), scrolls when a site has many ports, and Sign Out now ends the whole
+  session (it previously left an admin signed in).
+- **Admin idle timeout** -- admins are signed out after a period with no mouse or
+  keyboard activity (Admin Account tab; default 5 minutes, 0 disables it). Enforced on
+  the server too, so background polling can't keep an unattended session alive.
+- **Baud auto-detect** -- in Configure Ports, Detect asks the site to listen at each
+  common speed (8N1, then 7E1) and pick the one that shows readable text.
+- **More webhook events** -- besides site offline and lockout: site online, admin login,
+  failed admin login, site enrolled, and an option to send every audit-log entry.
+- **Enrollment tokens** -- unused tokens can be viewed again from the Tokens list.
 ## Quick start (development)
 
 ```bash

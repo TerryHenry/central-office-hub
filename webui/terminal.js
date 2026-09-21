@@ -58,6 +58,7 @@ document.getElementById('terminalLoginForm').addEventListener('submit', async (e
       password: document.getElementById('terminalPassword').value
     });
     await showPicker();
+    autoConnectFromQuery();
   } catch (err) {
     errorEl.textContent = err.message;
   }
@@ -68,28 +69,91 @@ document.getElementById('pickerSignOutBtn').addEventListener('click', async () =
   window.location.reload();
 });
 
+let allChoices = [];
+let selectedSiteId = null;
+let autoConnectDone = false;
+
 async function showPicker() {
   const errorEl = document.getElementById('pickerError');
-  const listEl = document.getElementById('choiceList');
-  const emptyEl = document.getElementById('pickerEmpty');
   errorEl.textContent = '';
-  listEl.innerHTML = '';
   showScreen(pickerScreen);
   try {
-    const choices = await apiGet('/api/terminal/choices');
-    emptyEl.style.display = choices.length ? 'none' : 'block';
-    for (const c of choices) {
-      const btn = document.createElement('button');
-      btn.textContent = `${c.siteName} — ${c.label}`;
-      btn.type = 'button';
-      btn.addEventListener('click', () => connectTerminal(c.siteId, c.portId, `${c.siteName} — ${c.label}`));
-      listEl.appendChild(btn);
-    }
+    allChoices = await apiGet('/api/terminal/choices');
+    selectedSiteId = null;
+    renderPicker();
   } catch (err) {
     errorEl.textContent = err.message;
   }
 }
 
+// Two levels: sites first, then that site's ports. A single-site user skips straight to
+// the ports (nothing to drill into).
+function renderPicker() {
+  const listEl = document.getElementById('choiceList');
+  const emptyEl = document.getElementById('pickerEmpty');
+  const headingEl = document.getElementById('pickerHeading');
+  const backBtn = document.getElementById('pickerBackBtn');
+  listEl.innerHTML = '';
+
+  const sites = new Map();
+  for (const c of allChoices) {
+    if (!sites.has(c.siteId)) sites.set(c.siteId, { name: c.siteName, ports: [] });
+    sites.get(c.siteId).ports.push(c);
+  }
+  emptyEl.style.display = sites.size ? 'none' : 'block';
+  if (sites.size === 1 && !selectedSiteId) selectedSiteId = [...sites.keys()][0];
+
+  if (selectedSiteId && sites.has(selectedSiteId)) {
+    const site = sites.get(selectedSiteId);
+    headingEl.textContent = site.name;
+    backBtn.style.display = sites.size > 1 ? '' : 'none';
+    for (const c of site.ports.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base', numeric: true }))) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = c.label + (c.permission === 'read-only' ? ' (read-only)' : '');
+      btn.addEventListener('click', () => connectTerminal(c.siteId, c.portId, `${c.siteName} — ${c.label}`));
+      listEl.appendChild(btn);
+    }
+    return;
+  }
+
+  headingEl.textContent = sites.size ? 'Choose a site' : '';
+  backBtn.style.display = 'none';
+  const ordered = [...sites.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name, undefined, { sensitivity: 'base', numeric: true }));
+  for (const [siteId, site] of ordered) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `${site.name} (${site.ports.length} port${site.ports.length === 1 ? '' : 's'})`;
+    btn.addEventListener('click', () => {
+      selectedSiteId = siteId;
+      renderPicker();
+    });
+    listEl.appendChild(btn);
+  }
+}
+
+document.getElementById('pickerBackBtn').addEventListener('click', () => {
+  selectedSiteId = null;
+  renderPicker();
+});
+
+// A link like /terminal?siteId=...&portId=... (opened from the fleet topology) connects
+// straight to that port once the caller is signed in, instead of stopping at the picker.
+function autoConnectFromQuery() {
+  if (autoConnectDone) return false;
+  autoConnectDone = true;
+  const params = new URLSearchParams(window.location.search);
+  const siteId = params.get('siteId');
+  const portId = params.get('portId');
+  if (!siteId || !portId) return false;
+  const match = allChoices.find((c) => c.siteId === siteId && c.portId === portId);
+  if (!match) {
+    document.getElementById('pickerError').textContent = 'That port is not available to you right now.';
+    return false;
+  }
+  connectTerminal(match.siteId, match.portId, `${match.siteName} — ${match.label}`);
+  return true;
+}
 let ws = null;
 let term = null;
 
@@ -144,6 +208,7 @@ document.getElementById('terminalDisconnectBtn').addEventListener('click', () =>
       return;
     }
     await showPicker();
+    autoConnectFromQuery();
   } catch {
     showScreen(loginScreen);
   }

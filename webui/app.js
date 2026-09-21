@@ -38,6 +38,9 @@ const api = {
 };
 
 async function apiError(res) {
+  // A 401 while the app is showing means the session ended (idle timeout, restart) --
+  // go back to the login screen instead of leaving a dead UI.
+  if (res.status === 401 && document.getElementById('appRoot').classList.contains('active')) window.location.reload();
   try {
     const body = await res.json();
     return new Error(body.error || `HTTP ${res.status}`);
@@ -145,6 +148,8 @@ async function boot() {
     document.body.classList.remove('app-mode');
     return;
   }
+  // Logged in: make sure no auth screen (login is visible by default) lingers over the app.
+  document.querySelectorAll('.auth-screen').forEach(hide);
   document.body.classList.add('app-mode');
   show(appRoot);
   await initApp();
@@ -335,6 +340,14 @@ function commandVerificationPill(site) {
 let lastTopologySites = [];
 let lastTopologyHaStatus = { configured: false };
 
+// Delegated once on the (persistent) svg element -- its contents are rebuilt on every refresh.
+document.getElementById('topologySvg').addEventListener('click', (e) => {
+  const link = e.target.closest('.topology-port-link');
+  if (!link) return;
+  const url = `/terminal?siteId=${encodeURIComponent(link.dataset.siteId)}&portId=${encodeURIComponent(link.dataset.portId)}`;
+  window.open(url, '_blank', 'noopener');
+});
+
 function renderTopology(sites, haStatus) {
   lastTopologySites = sites;
   if (haStatus !== undefined) lastTopologyHaStatus = haStatus;
@@ -467,10 +480,13 @@ function renderTopology(sites, haStatus) {
       const portStatusClass = portOnline ? 'online' : 'offline';
       const accessSuffix = port.access ? ` — ${accessLabel(port.access)}` : '';
       edgeParts.push(edge(SITE_X, siteY, PORT_X, py));
+      // A connected site's port is clickable: opens that port's web console in a new tab.
+      if (site.connected) nodeParts.push(`<g class="topology-port-link" data-site-id="${escapeHtml(site.id)}" data-port-id="${escapeHtml(port.id)}">`);
       nodeParts.push(
-        `<circle class="topology-node ${portStatusClass}" cx="${PORT_X}" cy="${py}" r="5"><title>${escapeHtml(port.label)} — ${reachTitle}${accessSuffix}</title></circle>`
+        `<circle class="topology-node ${portStatusClass}" cx="${PORT_X}" cy="${py}" r="5"><title>${escapeHtml(port.label)} — ${reachTitle}${accessSuffix}${site.connected ? ' — click to open a console' : ''}</title></circle>`
       );
       label(PORT_X + 11, py + 4, port.label);
+      if (site.connected) nodeParts.push('</g>');
     });
   }
 
@@ -812,13 +828,37 @@ function addSitePortRow(port) {
   tr.innerHTML = `
     <td><input type="text" class="site-port-label" value="${escapeHtml(port?.label || '')}" placeholder="e.g. Router Console" /></td>
     <td><input type="text" class="site-port-path" value="${escapeHtml(port?.path || '')}" placeholder="/dev/ttyUSB0" /></td>
-    <td><input type="number" class="site-port-baud" value="${port?.baudRate || 9600}" style="width: 5.5em" /></td>
+    <td><input type="number" class="site-port-baud" value="${port?.baudRate || 9600}" style="width: 5.5em" /> <button type="button" class="secondary detect-baud-btn" title="Listen at each common speed and pick the one that shows readable text" style="padding:1px 8px; font-size:11px;">Detect</button><div class="hint detect-baud-msg"></div></td>
     <td><select class="site-port-access">${ACCESS_OPTIONS.map(([v, l]) => `<option value="${v}" ${port?.access === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
     <td><input type="checkbox" class="site-port-capture" ${port?.captureEnabled ? 'checked' : ''} /></td>
     <td><button class="secondary remove-port-row-btn">Remove</button>${deleteBtn}</td>
   `;
   tr.dataset.portId = port?.id || '';
   tr.querySelector('.remove-port-row-btn').addEventListener('click', () => tr.remove());
+  tr.querySelector('.detect-baud-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const msg = tr.querySelector('.detect-baud-msg');
+    const devPath = tr.querySelector('.site-port-path').value.trim();
+    if (!devPath) {
+      msg.textContent = 'Enter the device path first.';
+      return;
+    }
+    btn.disabled = true;
+    msg.textContent = 'Listening at each speed…';
+    try {
+      const r = await api.post(`/api/sites/${document.getElementById('sitePortsSiteId').value}/detect-baud`, { path: devPath });
+      if (r.baudRate) {
+        tr.querySelector('.site-port-baud').value = r.baudRate;
+        msg.textContent = `Detected ${r.baudRate} ${r.framing}`;
+      } else {
+        msg.textContent = r.reason;
+      }
+    } catch (err) {
+      msg.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
   const delBtn = tr.querySelector('.delete-port-btn');
   if (delBtn) {
     delBtn.addEventListener('click', () => {
@@ -965,7 +1005,7 @@ async function loadSiteLldp() {
   tbody.innerHTML = '';
   try {
     const data = await api.get(`/api/sites/${siteId}/lldp`);
-    stateEl.textContent = !data.installed ? 'lldpd is not installed on this site (sudo apt-get install lldpd).' : data.active ? 'Neighbor discovery is running on this site.' : 'Neighbor discovery is not running on this site.';
+    stateEl.textContent = !data.installed ? 'lldpd is not installed on this site. It installs automatically when the site restarts (needs internet).' : data.active ? 'Neighbor discovery is running on this site.' : 'Neighbor discovery is not running on this site.';
     document.getElementById('siteLldpEnabled').checked = !!data.active;
     document.getElementById('siteLldpCdp').checked = !!data.cdp;
     document.getElementById('siteLldpFdp').checked = !!data.fdp;
@@ -1211,9 +1251,19 @@ async function loadTokens() {
       <td></td>
     `;
     const actionsCell = tr.lastElementChild;
+    if (status === 'Unused') {
+      const viewBtn = document.createElement('button');
+      viewBtn.textContent = 'View';
+      viewBtn.addEventListener('click', () => {
+        document.getElementById('tokenRevealValue').textContent = t.token;
+        document.getElementById('tokenRevealBackdrop').classList.add('open');
+      });
+      actionsCell.appendChild(viewBtn);
+    }
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Revoke';
     delBtn.className = 'danger';
+    delBtn.style.marginLeft = '6px';
     delBtn.addEventListener('click', async () => {
       await api.del(`/api/enrollment-tokens/${t.token}`);
       await loadTokens();
@@ -2201,19 +2251,20 @@ document.getElementById('testSyslogBtn').addEventListener('click', async () => {
 async function loadAlertsSettings() {
   const alerts = await api.get('/api/alerts');
   document.getElementById('alertsWebhookUrl').value = alerts.webhookUrl;
-  document.getElementById('alertsNotifyOnSiteOffline').checked = alerts.notifyOnSiteOffline;
-  document.getElementById('alertsNotifyOnLockout').checked = alerts.notifyOnLockout;
+  document.querySelectorAll('[data-alert-key]').forEach((cb) => {
+    cb.checked = !!alerts[cb.dataset.alertKey];
+  });
 }
 
 document.getElementById('saveAlertsBtn').addEventListener('click', async () => {
   const msg = document.getElementById('alertsMsg');
   msg.textContent = '';
   try {
-    await api.post('/api/alerts', {
-      webhookUrl: document.getElementById('alertsWebhookUrl').value.trim(),
-      notifyOnSiteOffline: document.getElementById('alertsNotifyOnSiteOffline').checked,
-      notifyOnLockout: document.getElementById('alertsNotifyOnLockout').checked
+    const body = { webhookUrl: document.getElementById('alertsWebhookUrl').value.trim() };
+    document.querySelectorAll('[data-alert-key]').forEach((cb) => {
+      body[cb.dataset.alertKey] = cb.checked;
     });
+    await api.post('/api/alerts', body);
     msg.style.color = 'var(--ok)';
     msg.textContent = 'Saved.';
   } catch (err) {
@@ -2483,7 +2534,7 @@ function applyLldpStatus(data) {
   document.getElementById('lldpStatusText').textContent = !data.installed ? 'lldpd not installed' : data.active ? 'Running' : 'Stopped';
   const msg = document.getElementById('lldpMsg');
   msg.style.color = 'var(--danger)';
-  msg.textContent = !data.installed ? 'lldpd is not installed on this host (sudo apt-get install lldpd).' : data.neighborsError || '';
+  msg.textContent = !data.installed ? 'lldpd is not installed on this host. It is installed automatically at startup (needs internet); by hand: sudo apt-get install lldpd' : data.neighborsError || '';
   const neighbors = data.neighbors || [];
   renderLldpNeighborRows(document.querySelector('#lldpNeighborsTable tbody'), neighbors);
   const empty = document.getElementById('lldpNeighborsEmpty');
@@ -2916,3 +2967,77 @@ async function initApp() {
 }
 
 boot();
+
+// ---------- Admin idle auto-logout ----------
+// The server enforces the timeout too (a session with no real activity is rejected), so
+// this is what makes the browser actually return to the login screen promptly.
+(function idleAutoLogout() {
+  let limitMs = 0;
+  let loaded = false;
+  let lastActivity = Date.now();
+  let lastTouch = 0;
+
+  function applyLimit(minutes) {
+    limitMs = minutes > 0 ? minutes * 60 * 1000 : 0;
+    const input = document.getElementById('idleTimeoutMinutes');
+    if (input && document.activeElement !== input) input.value = minutes;
+  }
+
+  for (const ev of ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel']) {
+    window.addEventListener(
+      ev,
+      () => {
+        lastActivity = Date.now();
+        if (limitMs && lastActivity - lastTouch > 30000 && appRoot.classList.contains('active')) {
+          lastTouch = lastActivity;
+          api.post('/api/session/touch').catch(() => {});
+        }
+      },
+      { passive: true }
+    );
+  }
+
+  setInterval(async () => {
+    if (!appRoot.classList.contains('active')) {
+      loaded = false;
+      limitMs = 0;
+      return;
+    }
+    if (!loaded) {
+      loaded = true;
+      lastActivity = Date.now();
+      try {
+        applyLimit((await api.get('/api/session')).idleTimeoutMinutes || 0);
+      } catch {
+        loaded = false;
+      }
+      return;
+    }
+    if (limitMs && Date.now() - lastActivity > limitMs) {
+      limitMs = 0;
+      try {
+        await api.post('/api/logout');
+      } catch {
+        // the server may already have expired it
+      }
+      window.location.reload();
+    }
+  }, 5000);
+
+  document.getElementById('saveIdleTimeoutBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('idleTimeoutMsg');
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '';
+    try {
+      const res = await api.post('/api/session-settings', {
+        idleTimeoutMinutes: Number(document.getElementById('idleTimeoutMinutes').value)
+      });
+      applyLimit(res.idleTimeoutMinutes);
+      lastActivity = Date.now();
+      msg.style.color = 'var(--ok)';
+      msg.textContent = 'Saved.';
+    } catch (err) {
+      msg.textContent = err.message;
+    }
+  });
+})();
