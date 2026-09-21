@@ -82,7 +82,8 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   tunnelled connection a web console uses, up to 5 devices at a time, and each device gets
   its own record: per-step status, the device's output, and the reason for any failure.
   A script stops on a device at its first failed step while the others carry on. Scripts
-  can be saved as templates, batches can be cancelled, and the last 50 are kept.- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
+  can be saved as templates, batches can be cancelled, and the last 50 are kept.
+- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
   Topology, System Information, plus Fleet Summary, Active Sessions and Recent Activity).
   **Customize** lets you hide, show and reorder them, and toggle individual System stat
   cards. The layout is stored in the browser, so it is per-browser, not per-account.
@@ -99,6 +100,10 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
 - **More webhook events** -- besides site offline and lockout: site online, admin login,
   failed admin login, site enrolled, and an option to send every audit-log entry.
 - **Enrollment tokens** -- unused tokens can be viewed again from the Tokens list.
+- **Two-factor on hub SSH logins** -- an admin with 2FA turned on is asked for the code on
+  SSH sign-in (keyboard-interactive), as the web UI already did, instead of getting in on the
+  password alone.
+
 ## Quick start (development)
 
 ```bash
