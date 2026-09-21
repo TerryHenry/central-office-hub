@@ -2189,8 +2189,9 @@ async function loadLogHistory() {
   await loadLogSettings();
   const lines = await api.get('/api/log');
   const logView = document.getElementById('logView');
-  logView.textContent = lines.length ? lines.join('\n') + '\n' : '';
-  logView.scrollTop = logView.scrollHeight;
+  // Newest entry first (the stored log itself stays in chronological order).
+  logView.textContent = lines.length ? [...lines].reverse().join('\n') + '\n' : '';
+  logView.scrollTop = 0;
 }
 
 // ---------- External syslog server ----------
@@ -2277,9 +2278,8 @@ function connectEvents() {
   eventSource = new EventSource('/api/events');
   const logView = document.getElementById('logView');
   eventSource.addEventListener('log', (e) => {
-    logView.textContent += JSON.parse(e.data) + '\n';
+    logView.textContent = JSON.parse(e.data) + '\n' + logView.textContent;
     trimLogView();
-    logView.scrollTop = logView.scrollHeight;
   });
   eventSource.addEventListener('sessions', (e) => renderSessions(JSON.parse(e.data)));
   eventSource.addEventListener('sites', () => loadSites());
@@ -3034,7 +3034,7 @@ let logMaxEntries = 1000;
 function trimLogView() {
   const logView = document.getElementById('logView');
   const lines = logView.textContent.split('\n');
-  if (lines.length > logMaxEntries + 1) logView.textContent = lines.slice(-(logMaxEntries + 1)).join('\n');
+  if (lines.length > logMaxEntries + 1) logView.textContent = lines.slice(0, logMaxEntries).join('\n') + '\n';
 }
 
 async function loadLogSettings() {

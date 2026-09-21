@@ -225,7 +225,7 @@
     try {
       const lines = await getJson('/api/log');
       const el = document.getElementById('dashRecentLog');
-      el.textContent = lines.slice(-10).join('\n') || 'Nothing logged yet.';
+      el.textContent = lines.slice(-10).reverse().join('\n') || 'Nothing logged yet.';
     } catch {
       // transient
     }
