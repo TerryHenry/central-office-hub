@@ -82,7 +82,16 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   tunnelled connection a web console uses, up to 5 devices at a time, and each device gets
   its own record: per-step status, the device's output, and the reason for any failure.
   A script stops on a device at its first failed step while the others carry on. Scripts
-  can be saved as templates, batches can be cancelled, and the last 50 are kept.- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
+  can be saved as templates, batches can be cancelled, and the last 50 are kept.- **Forwards** -- reach a device on a site's own network (a switch's web page, an SSH login,
+  anything TCP) from an admin's computer, through that site's existing tunnel. Name the
+  device and port on the Forwards tab, then **Connect** gives the one-line command, e.g.
+  `ssh -N -L 8443:bldg3-switch:443 -p 443 you@hub`. It is an ordinary SSH port forward to a
+  forward's *name*: nothing new listens on the hub or at the site, only named devices on
+  their set port are reachable (a raw IP is refused), console users can't use it, and every
+  connection and refusal is logged. Each forward has a **Test** button that has the site
+  connect to the device and report why if it can't. Since this is network access into a
+  site, hub SSH logins for admins with 2FA on now ask for the code (keyboard-interactive),
+  as the web UI already did.- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
   Topology, System Information, plus Fleet Summary, Active Sessions and Recent Activity).
   **Customize** lets you hide, show and reorder them, and toggle individual System stat
   cards. The layout is stored in the browser, so it is per-browser, not per-account.
