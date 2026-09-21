@@ -665,7 +665,7 @@ async function loadSites() {
     menuItems.push({
       label: 'Sync Users',
       onClick: async () => {
-        if (!confirm(`Push this hub's console users who have access to "${site.name}" (via group grants or an explicit push) to that box as local logins? It replaces only hub-managed logins there -- accounts created locally on the box are left alone. Applies on its next heartbeat.`)) return;
+        if (!confirm(`Push this hub's console users who have access to "${site.name}" (via group grants or an explicit push) to that box as local logins? It REPLACES every user on that box -- accounts created locally there are removed, as Sync Admins does for admins. Applies on its next heartbeat.`)) return;
         await api.post(`/api/sites/${site.id}/sync-users`);
         alert(`A user sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
       }
@@ -725,7 +725,7 @@ document.getElementById('bulkSyncUsersBtn').addEventListener('click', async () =
     alert('Select at least one site first.');
     return;
   }
-  if (!confirm(`Push this hub's console users to ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} as local logins? Each site gets only the users who have access to it, and only hub-managed logins there are replaced. Each applies on its own next heartbeat.`)) return;
+  if (!confirm(`Push this hub's console users to ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} as local logins? Each site gets only the users who have access to it, and REPLACES every user on that box -- accounts created locally there are removed. Each applies on its own next heartbeat.`)) return;
   const result = await api.post('/api/sites/sync-users/bulk', { siteIds });
   alert(`Queued a user sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
 });
