@@ -32,10 +32,13 @@ case "${1:-}" in
     cdp=0; fdp=0
     case " $args " in *" -c "*) cdp=1 ;; esac
     case " $args " in *" -f "*) fdp=1 ;; esac
+    showall=0
+    case " $args " in *" -H 0 "*) showall=1 ;; esac
     echo "installed=$installed"
     echo "active=$active"
     echo "cdp=$cdp"
     echo "fdp=$fdp"
+    echo "showall=$showall"
     ;;
   lldp-set)
     # lldp-set <enabled 0|1> <cdp 0|1> <fdp 0|1>. Fixed flags only -- nothing the caller
@@ -51,6 +54,10 @@ case "${1:-}" in
     daemon_args=""
     [ "$cdp" = "1" ] && daemon_args="$daemon_args -c"
     [ "$fdp" = "1" ] && daemon_args="$daemon_args -f"
+    # lldpd hides a neighbor heard over several protocols and shows only the "best" one by
+    # default (-H 15), so a switch seen over both LLDP and CDP would appear as LLDP only.
+    # -H 0 turns that filtering off so every protocol heard is listed.
+    if [ "$cdp" = "1" ] || [ "$fdp" = "1" ]; then daemon_args="$daemon_args -H 0"; fi
     daemon_args="${daemon_args# }"
     printf '# Managed by the terminal server admin UI.\nDAEMON_ARGS="%s"\n' "$daemon_args" > /etc/default/lldpd
     if [ "$enabled" = "1" ]; then

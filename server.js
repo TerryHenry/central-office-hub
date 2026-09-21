@@ -20,8 +20,13 @@ logStore.init(configStore.DATA_DIR);
 const lldpInstallTimer = setTimeout(() => {
   require('./lib/lldp')
     .ensureInstalled()
-    .then((s) => {
+    .then(async (s) => {
       if (!s.installed && process.platform === 'linux') console.log('lldpd is not installed and could not be installed automatically');
+      // Boxes that already had CDP/FDP on predate the show-every-protocol setting: re-apply
+      // their current choice so lldpd is restarted with it.
+      if (s.installed && s.active && (s.cdp || s.fdp) && !s.showAll) {
+        await require('./lib/lldp').setConfig({ enabled: true, cdp: s.cdp, fdp: s.fdp });
+      }
     })
     .catch((err) => console.log('automatic lldpd install failed: ' + err.message));
 }, 5 * 60 * 1000);
