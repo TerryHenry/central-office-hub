@@ -653,6 +653,16 @@ async function loadSites() {
       }
     });
     menuItems.push({
+      label: 'Re-enroll (replacement box)',
+      onClick: async () => {
+        if (!confirm(`Issue a one-time token to re-enroll a replacement box as "${site.name}"? Whoever redeems it takes over this site's ports, grants and settings, and the current box's key stops working once it does. The token expires in 60 minutes.`)) return;
+        const token = await api.post('/api/enrollment-tokens', { siteId: site.id });
+        document.getElementById('tokenRevealValue').textContent = token.token;
+        document.getElementById('tokenRevealBackdrop').classList.add('open');
+        await loadTokens();
+      }
+    });
+    menuItems.push({
       label: 'Sync Users',
       onClick: async () => {
         if (!confirm(`Push this hub's console users who have access to "${site.name}" (via group grants or an explicit push) to that box as local logins? It replaces only hub-managed logins there -- accounts created locally on the box are left alone. Applies on its next heartbeat.`)) return;
@@ -1208,32 +1218,6 @@ document.getElementById('saveSiteTftpUploadBtn').addEventListener('click', async
   }
 });
 
-document.getElementById('addSiteBtn').addEventListener('click', () => {
-  document.getElementById('siteName').value = '';
-  document.getElementById('sitePublicKey').value = '';
-  clearFieldError('siteName');
-  clearFieldError('sitePublicKey');
-  document.getElementById('siteModalBackdrop').classList.add('open');
-});
-document.getElementById('cancelSiteBtn').addEventListener('click', () => {
-  document.getElementById('siteModalBackdrop').classList.remove('open');
-});
-document.getElementById('saveSiteBtn').addEventListener('click', async () => {
-  const name = document.getElementById('siteName').value.trim();
-  const publicKey = document.getElementById('sitePublicKey').value.trim();
-  let valid = true;
-  if (!name) { setFieldError('siteName', 'A site name is required.'); valid = false; }
-  if (!publicKey) { setFieldError('sitePublicKey', 'A public key is required.'); valid = false; }
-  if (!valid) return;
-  try {
-    await api.post('/api/sites', { name, publicKey });
-    document.getElementById('siteModalBackdrop').classList.remove('open');
-    await loadSites();
-  } catch (err) {
-    setFieldError('sitePublicKey', err.message);
-  }
-});
-
 // ---------- Enrollment tokens ----------
 async function loadTokens() {
   const tokens = await api.get('/api/enrollment-tokens');
@@ -1244,7 +1228,7 @@ async function loadTokens() {
     const expired = t.expiresAt && new Date(t.expiresAt).getTime() < Date.now();
     const status = t.used ? 'Used' : expired ? 'Expired' : 'Unused';
     tr.innerHTML = `
-      <td>${escapeHtml(t.name)}</td>
+      <td>${escapeHtml(t.name)}${t.siteId ? ' <span class="hint">(re-enroll)</span>' : ''}</td>
       <td>${new Date(t.createdAt).toLocaleString()}</td>
       <td>${t.expiresAt ? new Date(t.expiresAt).toLocaleString() : '<span class="hint">never</span>'}</td>
       <td>${escapeHtml(status)}</td>

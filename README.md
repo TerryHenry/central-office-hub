@@ -73,6 +73,7 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   block size and window size (RFC 2347/2348/2349/7440) and streams from disk, which is
   what makes large downloads fast.
 
+- **Token-only enrollment** -- manual public-key entry is gone; sites enroll with a token. **Re-enroll (replacement box)** on a site's row issues a one-time token tied to that site, so a replacement box inherits its ports, grants and settings.
 - **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
   Topology, System Information, plus Fleet Summary, Active Sessions and Recent Activity).
   **Customize** lets you hide, show and reorder them, and toggle individual System stat

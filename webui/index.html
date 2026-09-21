@@ -157,7 +157,6 @@
           <tbody></tbody>
         </table>
         <div class="field-row">
-          <button id="addSiteBtn">+ Add Site</button>
           <button id="bulkQueueUpdateBtn">Upgrade Version for Selected</button>
           <button id="bulkSyncAdminsBtn" class="danger">Sync Admins for Selected</button>
           <button id="bulkSyncUsersBtn">Sync Users for Selected</button>
@@ -168,7 +167,7 @@
 
       <div class="panel">
         <h2>Enrollment Tokens</h2>
-        <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it without copying its public key by hand.</p>
+        <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it. To replace a box that failed, use <strong>Re-enroll</strong> on its row in the Sites list instead, so the new box keeps that site's ports and grants.</p>
         <table class="data-table" id="tokensTable">
           <thead><tr><th>Site name</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
           <tbody></tbody>
@@ -796,27 +795,6 @@
           <a href="/HANDBOOK.html" target="_blank" rel="noopener">Open Handbook in a new tab</a>
         </div>
         <iframe id="handbookFrame" title="Handbook" style="width: 100%; height: 80vh; border: none; margin-top: 10px;"></iframe>
-      </div>
-    </div>
-  </div>
-
-  <!-- Add site modal -->
-  <div class="modal-backdrop" id="siteModalBackdrop">
-    <div class="modal">
-      <h3>Add Site</h3>
-      <div class="field-row column">
-        <label for="siteName">Site name</label>
-        <input type="text" id="siteName" placeholder="e.g. Building 3 Wiring Closet" />
-        <span class="field-error" id="siteNameError"></span>
-      </div>
-      <div class="field-row column">
-        <label for="sitePublicKey">Tunnel public key</label>
-        <textarea id="sitePublicKey" rows="3" placeholder="ssh-ed25519 AAAA... (from the edge box's Network tab)"></textarea>
-        <span class="field-error" id="sitePublicKeyError"></span>
-      </div>
-      <div class="modal-actions">
-        <button id="cancelSiteBtn" class="secondary">Cancel</button>
-        <button id="saveSiteBtn" class="primary">Add Site</button>
       </div>
     </div>
   </div>
