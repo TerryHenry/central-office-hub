@@ -49,11 +49,32 @@ button.primary:hover { background: var(--accent-hover); }
 button.secondary { background: transparent; }
 button.danger { color: var(--danger); border-color: var(--danger-border); }
 
-.tabs { display: flex; gap: 2px; padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border); }
-.tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 14px; color: var(--text-dim); white-space: nowrap; }
-.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
-.tab-content { display: none; overflow-y: auto; flex: 1; padding: 20px; }
+/* Left sidebar navigation, grouped like the edge appliance's */
+.app-body { display: flex; flex: 1; min-height: 0; }
+.sidebar { width: 196px; flex-shrink: 0; display: flex; flex-direction: column; overflow-y: auto; padding: 14px 10px; border-right: 1px solid var(--border); }
+.sidebar-main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.sidebar-footer { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 1px; }
+.nav-group { display: flex; flex-direction: column; gap: 1px; }
+.nav-group-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent-hover); padding: 0 10px 5px; }
+.sidebar .tab-btn { background: transparent; border: none; border-left: 2px solid transparent; border-radius: 6px; padding: 8px 10px; text-align: left; color: var(--text-dim); font-size: 13px; white-space: nowrap; }
+.sidebar .tab-btn:hover { background: var(--overlay-1); color: var(--text); }
+.sidebar .tab-btn.active { background: var(--overlay-2); color: var(--text); border-left-color: var(--accent); font-weight: 500; }
+.tab-panel-area { flex: 1; overflow-y: auto; padding: 20px; min-width: 0; }
+.tab-content { display: none; }
 .tab-content.active { display: block; }
+
+/* On a narrow screen the sidebar becomes a scrollable strip across the top instead. */
+@media (max-width: 760px) {
+  .app-body { flex-direction: column; }
+  .sidebar { width: auto; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid var(--border); padding: 6px 8px; }
+  .sidebar-main { flex-direction: row; gap: 4px; flex: none; }
+  .nav-group { flex-direction: row; align-items: center; gap: 2px; }
+  .nav-group-label { display: none; }
+  .sidebar-footer { flex-direction: row; border-top: none; margin: 0 0 0 4px; padding: 0; }
+  .sidebar .tab-btn { border-left: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 10px; }
+  .sidebar .tab-btn.active { border-bottom-color: var(--accent); }
+  .tab-panel-area { padding: 12px; }
+}
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
 .panel:last-child { margin-bottom: 0; }

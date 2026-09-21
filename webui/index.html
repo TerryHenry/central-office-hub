@@ -68,22 +68,42 @@
       <button id="logoutBtn" class="secondary">Sign Out</button>
     </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-      <button class="tab-btn" data-tab="sites">Sites</button>
-      <button class="tab-btn" data-tab="users">Users</button>
-      <button class="tab-btn" data-tab="groups">Groups</button>
-      <button class="tab-btn" data-tab="network">Network</button>
-      <button class="tab-btn" data-tab="tftp">TFTP</button>
-      <button class="tab-btn" data-tab="sessions">Sessions</button>
-      <button class="tab-btn" data-tab="batch">Batch</button>
-      <button class="tab-btn" data-tab="log">Log</button>
-      <button class="tab-btn" data-tab="system">System</button>
-      <button class="tab-btn" data-tab="account">Admins</button>
-      <button class="tab-btn" data-tab="about">About</button>
-      <button class="tab-btn" data-tab="help">Help</button>
-    </div>
+    <div class="app-body">
+      <nav class="sidebar">
+        <div class="sidebar-main">
+          <div class="nav-group">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">Fleet</div>
+            <button class="tab-btn" data-tab="sites">Sites</button>
+            <button class="tab-btn" data-tab="batch">Batch</button>
+            <button class="tab-btn" data-tab="tftp">TFTP</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">Access</div>
+            <button class="tab-btn" data-tab="users">Users</button>
+            <button class="tab-btn" data-tab="groups">Groups</button>
+            <button class="tab-btn" data-tab="sessions">Sessions</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">This hub</div>
+            <button class="tab-btn" data-tab="network">Network</button>
+            <button class="tab-btn" data-tab="system">System</button>
+            <button class="tab-btn" data-tab="log">Log</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">Security</div>
+            <button class="tab-btn" data-tab="account">Admin Accounts</button>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <button class="tab-btn" data-tab="about">About</button>
+          <button class="tab-btn" data-tab="help">Help</button>
+        </div>
+      </nav>
 
+      <main class="tab-panel-area">
     <div class="tab-content active" id="tab-dashboard">
       <div class="panel">
         <h2>System</h2>
@@ -864,6 +884,8 @@
         </div>
         <iframe id="handbookFrame" title="Handbook" style="width: 100%; height: 80vh; border: none; margin-top: 10px;"></iframe>
       </div>
+    </div>
+      </main>
     </div>
   </div>
 

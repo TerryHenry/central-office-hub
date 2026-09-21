@@ -94,7 +94,7 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   the ports), scrolls when a site has many ports, and Sign Out now ends the whole
   session (it previously left an admin signed in).
 - **Admin idle timeout** -- admins are signed out after a period with no mouse or
-  keyboard activity (Admin Account tab; default 5 minutes, 0 disables it). Enforced on
+  keyboard activity (Admin Accounts tab; default 5 minutes, 0 disables it). Enforced on
   the server too, so background polling can't keep an unattended session alive.
 - **Baud auto-detect** -- in Configure Ports, Detect asks the site to listen at each
   common speed (8N1, then 7E1) and pick the one that shows readable text.
@@ -164,7 +164,7 @@ app itself has no failover logic and doesn't need to know HA exists. See
 - Whichever node is standby keeps the main service **stopped** and periodically pulls
   the active node's data -- never half-running against stale state.
 - No automatic failback: a recovered primary comes back as a healthy standby and stays
-  there until an admin clicks **Reclaim Primary Role** in the Account tab (or sets
+  there until an admin clicks **Reclaim Primary Role** in the Admin Accounts tab (or sets
   `preemptOnRecovery: true` for classic auto-preempt behavior).
 - Two addressing modes, chosen per your network: `"vip"` (a floating IP via `ip addr`
   + gratuitous ARP -- needs both VMs on the same L2 segment, fails over in seconds) or
@@ -181,7 +181,7 @@ app itself has no failover logic and doesn't need to know HA exists. See
    account, installs `ha-agent.service`, and grants it the narrow sudoers rule it needs
    to start/stop the main service. It does **not** need `ha-agent-config.example.json`
    copied by hand anymore -- the next step does that from the web UI.
-3. Log into the admin UI for **this** node and open the Account tab's **High
+3. Log into the admin UI for **this** node and open the Admin Accounts tab's **High
    Availability** panel. Fill in `role` (`primary` on one VM, `secondary` on the
    other), `peerHost`, `listenPort`/`peerPort` (same number on both nodes is simplest,
    since each is a different host), and either the VIP fields or a DNS update command,
@@ -207,7 +207,7 @@ expected path -- use the panel, which validates input before writing it.
 
 ## Applying updates
 
-The Account tab's **Version & Updates** panel checks GitHub for a newer release and, if
+The Admin Accounts tab's **Version & Updates** panel checks GitHub for a newer release and, if
 one publishes an in-place update package, applies it directly: download, checksum
 verification, signature verification against a public key baked in at build time
 (never fetched from GitHub), syntax-check the new version before touching anything
