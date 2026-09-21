@@ -664,11 +664,7 @@ async function loadSites() {
     });
     menuItems.push({
       label: 'Sync Users',
-      onClick: async () => {
-        if (!confirm(`Push this hub's console users who have access to "${site.name}" (via group grants or an explicit push) to that box as local logins? It replaces only hub-managed logins there -- accounts created locally on the box are left alone. Applies on its next heartbeat.`)) return;
-        await api.post(`/api/sites/${site.id}/sync-users`);
-        alert(`A user sync was queued for "${site.name}" -- it applies on the box's next heartbeat.`);
-      }
+      onClick: () => openSyncUsersModal([site.id], `Site: ${site.name}`)
     });
     menuItems.push({
       label: 'Delete Site',
@@ -719,15 +715,45 @@ document.getElementById('bulkSyncAdminsBtn').addEventListener('click', async () 
   alert(`Queued an admin sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
 });
 
-document.getElementById('bulkSyncUsersBtn').addEventListener('click', async () => {
+// ---------- Sync Users (choose which users go to the selected site(s)) ----------
+let syncUsersSiteIds = [];
+function openSyncUsersModal(siteIds, label) {
+  syncUsersSiteIds = siteIds;
+  document.getElementById('syncUsersTarget').textContent = label;
+  document.getElementById('syncUsersError').textContent = '';
+  document.querySelector('input[name="syncUsersScope"][value="access"]').checked = true;
+  document.getElementById('syncUsersModalBackdrop').classList.add('open');
+}
+document.getElementById('cancelSyncUsersBtn').addEventListener('click', () => {
+  document.getElementById('syncUsersModalBackdrop').classList.remove('open');
+});
+document.getElementById('confirmSyncUsersBtn').addEventListener('click', async () => {
+  const errEl = document.getElementById('syncUsersError');
+  const scope = document.querySelector('input[name="syncUsersScope"]:checked').value;
+  errEl.textContent = '';
+  try {
+    const result =
+      syncUsersSiteIds.length === 1
+        ? await api.post(`/api/sites/${syncUsersSiteIds[0]}/sync-users`, { scope })
+        : await api.post('/api/sites/sync-users/bulk', { siteIds: syncUsersSiteIds, scope });
+    document.getElementById('syncUsersModalBackdrop').classList.remove('open');
+    const n = result.users;
+    alert(
+      n === 0
+        ? 'Queued -- but no hub users matched, so the site\'s hub-managed logins will be cleared. Choose "Every hub user", or grant the users\' groups a port on this site, if you expected accounts to be pushed.'
+        : `Queued ${n} account${n === 1 ? '' : 's'} -- applies on the box's next heartbeat.`
+    );
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+document.getElementById('bulkSyncUsersBtn').addEventListener('click', () => {
   const siteIds = Array.from(document.querySelectorAll('#sitesTable .site-select:checked')).map((cb) => cb.dataset.site);
   if (siteIds.length === 0) {
     alert('Select at least one site first.');
     return;
   }
-  if (!confirm(`Push this hub's console users to ${siteIds.length} site${siteIds.length === 1 ? '' : 's'} as local logins? Each site gets only the users who have access to it, and only hub-managed logins there are replaced. Each applies on its own next heartbeat.`)) return;
-  const result = await api.post('/api/sites/sync-users/bulk', { siteIds });
-  alert(`Queued a user sync for ${result.queued} site${result.queued === 1 ? '' : 's'}.`);
+  openSyncUsersModal(siteIds, `Sites: ${siteIds.length} selected`);
 });
 
 document.getElementById('bulkTftpUploadBtn').addEventListener('click', () => {

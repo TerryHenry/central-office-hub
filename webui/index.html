@@ -857,6 +857,27 @@
   </div>
 
   <!-- Add/edit user modal -->
+  <!-- Sync Users scope modal -->
+  <div class="modal-backdrop" id="syncUsersModalBackdrop">
+    <div class="modal">
+      <h3>Sync Users</h3>
+      <p class="hint" id="syncUsersTarget"></p>
+      <div class="field-row column">
+        <label><input type="radio" name="syncUsersScope" value="access" checked /> Only users with access to the site</label>
+        <span class="hint">Users in a group that is granted one of the site's ports, or explicitly pushed to it. Anyone else is left off, since a login on an edge box can reach all of its ports.</span>
+      </div>
+      <div class="field-row column">
+        <label><input type="radio" name="syncUsersScope" value="all" /> Every hub user, like Sync Admins</label>
+        <span class="hint">All hub users get a login on the site (read/write unless set otherwise under the user's &quot;Access on pushed sites&quot;). Later user changes then re-sync automatically.</span>
+      </div>
+      <p class="hint">Replaces only hub-managed logins on the box &mdash; accounts created locally are left alone. Applies on its next heartbeat.</p>
+      <span class="auth-error" id="syncUsersError"></span>
+      <div class="modal-actions">
+        <button id="cancelSyncUsersBtn" class="secondary">Cancel</button>
+        <button id="confirmSyncUsersBtn" class="primary">Queue Sync</button>
+      </div>
+    </div>
+  </div>
   <!-- Site neighbor discovery (LLDP/CDP/FDP) modal -->
   <div class="modal-backdrop" id="siteLldpModalBackdrop">
     <div class="modal" style="max-width: 960px; width: 96%;">
