@@ -74,7 +74,15 @@ high availability -- see [HANDBOOK.html](HANDBOOK.html).
   what makes large downloads fast.
 
 - **Token-only enrollment** -- manual public-key entry is gone; sites enroll with a token. **Re-enroll (replacement box)** on a site's row issues a one-time token tied to that site, so a replacement box inherits its ports, grants and settings.
-- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
+- **Batch actions** -- the Batch tab runs one script against many ports across any number
+  of sites, for jobs like logging in and rebooting, factory-resetting or upgrading a rack
+  of devices. Steps are one per line (`login`, `send`, `expect`, `expect-regex`, `wait`,
+  `set`; any other line is typed as a command), with `{{username}}`/`{{password}}` filled
+  in per device from fields that are never saved. Runs happen from the hub over the same
+  tunnelled connection a web console uses, up to 5 devices at a time, and each device gets
+  its own record: per-step status, the device's output, and the reason for any failure.
+  A script stops on a device at its first failed step while the others carry on. Scripts
+  can be saved as templates, batches can be cancelled, and the last 50 are kept.- **Configurable dashboard** -- the Dashboard tab is a set of widgets (System, Fleet
   Topology, System Information, plus Fleet Summary, Active Sessions and Recent Activity).
   **Customize** lets you hide, show and reorder them, and toggle individual System stat
   cards. The layout is stored in the browser, so it is per-browser, not per-account.

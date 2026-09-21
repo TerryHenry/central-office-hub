@@ -76,6 +76,7 @@
       <button class="tab-btn" data-tab="network">Network</button>
       <button class="tab-btn" data-tab="tftp">TFTP</button>
       <button class="tab-btn" data-tab="sessions">Sessions</button>
+      <button class="tab-btn" data-tab="batch">Batch</button>
       <button class="tab-btn" data-tab="log">Log</button>
       <button class="tab-btn" data-tab="system">System</button>
       <button class="tab-btn" data-tab="account">Admins</button>
@@ -388,6 +389,67 @@
       </div>
     </div>
 
+    <div class="tab-content" id="tab-batch">
+      <div class="panel">
+        <h2>Run a Batch</h2>
+        <p class="hint">Types a script into the console of every port you choose &mdash; for example to log in and reboot, factory-reset, or upgrade many devices at once &mdash; and keeps a record of each device. Runs from this hub over the same connection a web console uses, so a port that someone else has open (exclusive access) will fail with that reason.</p>
+        <div class="field-row">
+          <label for="batchName">Name</label>
+          <input type="text" id="batchName" placeholder="e.g. Reboot lab switches" autocomplete="off" style="width: 22em" />
+        </div>
+        <div class="field-row">
+          <select id="batchPreset"></select>
+          <select id="batchTemplate"></select>
+          <button id="batchSaveTemplateBtn" type="button" class="secondary">Save script&hellip;</button>
+          <button id="batchDeleteTemplateBtn" type="button" class="secondary">Delete saved</button>
+        </div>
+        <div class="field-row column">
+          <label for="batchScript">Script <span class="hint">(one step per line)</span></label>
+          <textarea id="batchScript" class="batch-script" rows="12" spellcheck="false" placeholder="login {{username}} {{password}}&#10;show version"></textarea>
+          <details class="batch-help">
+            <summary>Script reference</summary>
+            <table class="data-table">
+              <tbody>
+                <tr><td><code>login &lt;user&gt; &lt;password&gt;</code></td><td>Log in. Skips itself if a prompt is already showing. Fails if the device rejects the login.</td></tr>
+                <tr><td><code>send &lt;text&gt;</code></td><td>Type the text and press Enter. A bare <code>send</code> just presses Enter. Any line that isn't one of these keywords is treated as <code>send</code>.</td></tr>
+                <tr><td><code>send-raw &lt;text&gt;</code></td><td>Type the text with no Enter. Escapes: <code>&#92;r &#92;n &#92;t &#92;e &#92;xNN</code> (for example <code>&#92;x03</code> is Ctrl-C).</td></tr>
+                <tr><td><code>expect &lt;text&gt;</code></td><td>Wait until the device prints this text (not case-sensitive). Fails after the timeout (30 s by default).</td></tr>
+                <tr><td><code>expect-regex &lt;pattern&gt; [timeout=N]</code></td><td>Same, with a regular expression and an optional timeout in seconds.</td></tr>
+                <tr><td><code>wait &lt;seconds&gt;</code></td><td>Pause.</td></tr>
+                <tr><td><code>set idle &lt;ms&gt;</code> / <code>set timeout &lt;seconds&gt;</code></td><td>Change how long to let the device go quiet after a command (default 1500 ms) and the default <code>expect</code> timeout.</td></tr>
+                <tr><td><code># comment</code></td><td>Ignored.</td></tr>
+                <tr><td><code>{{username}} {{password}} {{site}} {{port}}</code></td><td>Filled in for each device. Username and password come from the fields below and are never saved.</td></tr>
+              </tbody>
+            </table>
+            <p class="hint">A script stops on a device at its first failed step; other devices carry on. Up to 5 devices run at a time.</p>
+          </details>
+        </div>
+        <div class="field-row">
+          <label for="batchUsername">Username</label>
+          <input type="text" id="batchUsername" autocomplete="off" style="width: 12em" />
+          <label for="batchPassword">Password</label>
+          <input type="password" id="batchPassword" autocomplete="new-password" style="width: 12em" />
+          <span class="hint">Used for <code>{{username}}</code> / <code>{{password}}</code>. Not saved.</span>
+        </div>
+        <div class="field-row column">
+          <label>Ports <span class="hint" id="batchSelectedCount"></span> <button id="batchRefreshTargetsBtn" type="button" class="secondary" style="margin-left: 8px; padding: 1px 8px; font-size: 11px;">Refresh</button></label>
+          <div id="batchTargets" class="batch-sites"></div>
+        </div>
+        <div class="field-row">
+          <button id="batchRunBtn" class="primary">Run Batch</button>
+          <span class="auth-error" id="batchError"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Batch History</h2>
+        <table class="data-table" id="batchHistoryTable">
+          <thead><tr><th>Name</th><th>Started</th><th>Status</th><th>Devices</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="batchHistoryEmpty">No batches have been run yet.</p>
+      </div>
+    </div>
     <div class="tab-content" id="tab-log">
       <div class="panel">
         <h2>Server Log</h2>
@@ -863,6 +925,18 @@
   </div>
 
   <!-- Add/edit user modal -->
+  <!-- Batch run detail -->
+  <div class="modal-backdrop" id="batchDetailBackdrop">
+    <div class="modal" style="max-width: 980px; width: 96%; max-height: 90vh; overflow-y: auto;">
+      <h3 id="batchDetailTitle"></h3>
+      <p id="batchDetailMeta"></p>
+      <details><summary class="hint">Script</summary><pre class="code-block" id="batchDetailScript"></pre></details>
+      <div id="batchDetailTargets"></div>
+      <div class="modal-actions">
+        <button id="batchDetailCloseBtn" class="secondary">Close</button>
+      </div>
+    </div>
+  </div>
   <!-- Site neighbor discovery (LLDP/CDP/FDP) modal -->
   <div class="modal-backdrop" id="siteLldpModalBackdrop">
     <div class="modal" style="max-width: 960px; width: 96%;">
@@ -1163,5 +1237,6 @@
   <script type="module" src="qrcode-bridge.js"></script>
   <script src="app.js"></script>
   <script src="dashboard.js"></script>
+  <script src="batch.js"></script>
 </body>
 </html>

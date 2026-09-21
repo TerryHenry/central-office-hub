@@ -266,3 +266,15 @@ code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overla
 .widget-stat-toggles { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; padding-top: 4px; }
 .widget-stat-toggles label { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
 .log-tail { margin: 0; max-height: 220px; overflow: auto; font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+/* Batch actions */
+.pill.bad { background: rgba(229, 83, 75, 0.14); color: var(--danger); }
+.batch-script { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.batch-sites { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding: 6px 2px; }
+.batch-site-head { display: flex; align-items: center; gap: 6px; }
+.batch-ports { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 0 0 24px; }
+.batch-port { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
+.batch-help summary { cursor: pointer; font-size: 12px; margin-top: 4px; }
+details.batch-target { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 8px 0; }
+details.batch-target summary { cursor: pointer; }
+.batch-steps { margin: 8px 0; }
+.batch-transcript { max-height: 220px; overflow: auto; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; }
