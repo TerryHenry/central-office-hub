@@ -394,6 +394,12 @@
         <div class="field-row">
           <button id="downloadLogBtn" class="secondary">Download Log</button>
         </div>
+        <div class="field-row">
+          <label for="logMaxEntries">Maximum log entries</label>
+          <input type="number" id="logMaxEntries" min="100" max="100000" style="width: 7em" />
+          <button id="saveLogMaxBtn" class="primary">Save</button>
+          <span class="auth-error" id="logMaxMsg"></span>
+        </div>
         <pre class="code-block log-view" id="logView"></pre>
       </div>
     </div>

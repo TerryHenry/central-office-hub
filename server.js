@@ -12,7 +12,7 @@ const tunnelServer = require('./lib/tunnelServer');
 const tftpServer = require('./lib/tftpServer');
 const { createWebServer } = require('./lib/webServer');
 
-logStore.init(configStore.DATA_DIR);
+logStore.init(configStore.DATA_DIR, configStore.getConfig().log.maxEntries);
 
 // Existing installs predate lldpd support -- fetch it in the background if it's missing. Deferred
 // a few minutes past startup so a Pi that's still booting (or finishing first-boot setup) isn't

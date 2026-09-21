@@ -2186,6 +2186,7 @@ document.getElementById('restoreBtn').addEventListener('click', async () => {
 
 // ---------- Log / live events ----------
 async function loadLogHistory() {
+  await loadLogSettings();
   const lines = await api.get('/api/log');
   const logView = document.getElementById('logView');
   logView.textContent = lines.length ? lines.join('\n') + '\n' : '';
@@ -2277,6 +2278,7 @@ function connectEvents() {
   const logView = document.getElementById('logView');
   eventSource.addEventListener('log', (e) => {
     logView.textContent += JSON.parse(e.data) + '\n';
+    trimLogView();
     logView.scrollTop = logView.scrollHeight;
   });
   eventSource.addEventListener('sessions', (e) => renderSessions(JSON.parse(e.data)));
@@ -3025,3 +3027,34 @@ boot();
     }
   });
 })();
+
+// ---------- Log size setting ----------
+let logMaxEntries = 1000;
+
+function trimLogView() {
+  const logView = document.getElementById('logView');
+  const lines = logView.textContent.split('\n');
+  if (lines.length > logMaxEntries + 1) logView.textContent = lines.slice(-(logMaxEntries + 1)).join('\n');
+}
+
+async function loadLogSettings() {
+  const s = await api.get('/api/log-settings');
+  logMaxEntries = s.maxEntries;
+  document.getElementById('logMaxEntries').value = s.maxEntries;
+  trimLogView();
+}
+
+document.getElementById('saveLogMaxBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('logMaxMsg');
+  msg.style.color = 'var(--danger)';
+  msg.textContent = '';
+  try {
+    const s = await api.post('/api/log-settings', { maxEntries: Number(document.getElementById('logMaxEntries').value) });
+    logMaxEntries = s.maxEntries;
+    await loadLogHistory();
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Saved.';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
