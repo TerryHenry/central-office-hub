@@ -1219,6 +1219,19 @@ document.getElementById('saveSiteTftpUploadBtn').addEventListener('click', async
 });
 
 // ---------- Enrollment tokens ----------
+// Tokens stay viewable in the list (masked until you click Show) so one never has to be
+// generated again just because the dialog it first appeared in was closed.
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = button.textContent;
+    button.textContent = 'Copied';
+    setTimeout(() => (button.textContent = old), 1200);
+  } catch {
+    window.prompt('Copy this:', text);
+  }
+}
+
 async function loadTokens() {
   const tokens = await api.get('/api/enrollment-tokens');
   const tbody = document.querySelector('#tokensTable tbody');
@@ -1227,36 +1240,39 @@ async function loadTokens() {
     const tr = document.createElement('tr');
     const expired = t.expiresAt && new Date(t.expiresAt).getTime() < Date.now();
     const status = t.used ? 'Used' : expired ? 'Expired' : 'Unused';
+    const masked = `${t.token.slice(0, 6)}\u2026${t.token.slice(-4)}`;
     tr.innerHTML = `
       <td>${escapeHtml(t.name)}${t.siteId ? ' <span class="hint">(re-enroll)</span>' : ''}</td>
+      <td><code class="token-text" style="word-break: break-all;">${escapeHtml(masked)}</code></td>
       <td>${new Date(t.createdAt).toLocaleString()}</td>
       <td>${t.expiresAt ? new Date(t.expiresAt).toLocaleString() : '<span class="hint">never</span>'}</td>
       <td>${escapeHtml(status)}</td>
       <td></td>
     `;
+    const tokenEl = tr.querySelector('.token-text');
     const actionsCell = tr.lastElementChild;
-    if (status === 'Unused') {
-      const viewBtn = document.createElement('button');
-      viewBtn.textContent = 'View';
-      viewBtn.addEventListener('click', () => {
-        document.getElementById('tokenRevealValue').textContent = t.token;
-        document.getElementById('tokenRevealBackdrop').classList.add('open');
-      });
-      actionsCell.appendChild(viewBtn);
-    }
-    const delBtn = document.createElement('button');
-    delBtn.textContent = 'Revoke';
-    delBtn.className = 'danger';
-    delBtn.style.marginLeft = '6px';
-    delBtn.addEventListener('click', async () => {
+    const addBtn = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (cls) b.className = cls;
+      b.style.marginRight = '6px';
+      b.addEventListener('click', () => fn(b));
+      actionsCell.appendChild(b);
+    };
+    let shown = false;
+    addBtn('Show', 'secondary', (b) => {
+      shown = !shown;
+      tokenEl.textContent = shown ? t.token : masked;
+      b.textContent = shown ? 'Hide' : 'Show';
+    });
+    addBtn('Copy', 'secondary', (b) => copyText(t.token, b));
+    addBtn('Revoke', 'danger', async () => {
       await api.del(`/api/enrollment-tokens/${t.token}`);
       await loadTokens();
     });
-    actionsCell.appendChild(delBtn);
     tbody.appendChild(tr);
   }
 }
-
 document.getElementById('addTokenBtn').addEventListener('click', () => {
   document.getElementById('tokenSiteName').value = '';
   document.getElementById('tokenExpiry').value = '';
@@ -1280,6 +1296,7 @@ document.getElementById('saveTokenBtn').addEventListener('click', async () => {
     setFieldError('tokenSiteName', err.message);
   }
 });
+document.getElementById('copyTokenRevealBtn').addEventListener('click', (e) => copyText(document.getElementById('tokenRevealValue').textContent, e.currentTarget));
 document.getElementById('closeTokenRevealBtn').addEventListener('click', () => {
   document.getElementById('tokenRevealBackdrop').classList.remove('open');
 });

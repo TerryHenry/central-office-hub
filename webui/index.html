@@ -170,7 +170,7 @@
         <h2>Enrollment Tokens</h2>
         <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it. To replace a box that failed, use <strong>Re-enroll</strong> on its row in the Sites list instead, so the new box keeps that site's ports and grants.</p>
         <table class="data-table" id="tokensTable">
-          <thead><tr><th>Site name</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Site name</th><th>Token</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <button id="addTokenBtn">+ Generate Token</button>
@@ -916,9 +916,10 @@
   <div class="modal-backdrop" id="tokenRevealBackdrop">
     <div class="modal">
       <h3>Enrollment Token</h3>
-      <p class="hint">Paste this into the edge box's Central Office panel. It's shown once and works one time.</p>
+      <p class="hint">Paste this into the edge box's Central Office panel. It works one time, and you can view it again any time from the Enrollment Tokens list.</p>
       <pre class="code-block" id="tokenRevealValue"></pre>
       <div class="modal-actions">
+        <button id="copyTokenRevealBtn" class="secondary">Copy</button>
         <button id="closeTokenRevealBtn" class="primary">Done</button>
       </div>
     </div>
