@@ -18,6 +18,8 @@ case "${1:-}" in
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y --no-install-recommends lldpd
+    # LLDP on by default (start now and at boot). CDP/FDP stay off -- opt-in via lldp-set.
+    systemctl enable --now lldpd >/dev/null 2>&1 || true
     ;;  lldp-status)
     # Read-only: reports whether lldpd is installed/running and which discovery protocols
     # it is configured to speak, as key=value lines the app parses.
