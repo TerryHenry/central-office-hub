@@ -20,6 +20,19 @@
       script: '# Logs in, then runs a command on each device.\nlogin {{username}} {{password}}\nshow version\n'
     },
     {
+      name: 'Ruckus ICX - Show Version',
+      script:
+        '# Ruckus ICX: log in, show the version, log out. The first quit clears any session left open;\n' +
+        '# skip / page turn the pager off and back on. Check the prompts on one device first.\n' +
+        'quit\n' +
+        'login {{username}} {{password}}\n' +
+        'enable\n' +
+        'skip\n' +
+        'show version\n' +
+        'page\n' +
+        'quit\n'
+    },
+    {
       name: 'Reboot (Cisco IOS style)',
       script:
         '# Example -- check the prompts against your device first, on one port.\n' +
