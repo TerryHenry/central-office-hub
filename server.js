@@ -14,13 +14,18 @@ const { createWebServer } = require('./lib/webServer');
 
 logStore.init(configStore.DATA_DIR);
 
-// Existing installs predate lldpd support -- fetch it in the background if it's missing.
-require('./lib/lldp')
-  .ensureInstalled()
-  .then((s) => {
-    if (!s.installed && process.platform === 'linux') console.log('lldpd is not installed and could not be installed automatically');
-  })
-  .catch((err) => console.log('automatic lldpd install failed: ' + err.message));
+// Existing installs predate lldpd support -- fetch it in the background if it's missing. Deferred
+// a few minutes past startup so a Pi that's still booting (or finishing first-boot setup) isn't
+// also running apt, and a failure never blocks or crashes anything.
+const lldpInstallTimer = setTimeout(() => {
+  require('./lib/lldp')
+    .ensureInstalled()
+    .then((s) => {
+      if (!s.installed && process.platform === 'linux') console.log('lldpd is not installed and could not be installed automatically');
+    })
+    .catch((err) => console.log('automatic lldpd install failed: ' + err.message));
+}, 5 * 60 * 1000);
+lldpInstallTimer.unref();
 
 const hostKey = ensureHostKey(configStore.DATA_DIR);
 const tlsCertPair = ensureTlsCert(configStore.DATA_DIR);

@@ -16,8 +16,8 @@ case "${1:-}" in
     # Fixed package name only. Idempotent: does nothing if lldpd is already present.
     if command -v lldpd >/dev/null 2>&1; then echo "already installed"; exit 0; fi
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
-    apt-get install -y --no-install-recommends lldpd
+    nice -n 19 apt-get update -qq
+    nice -n 19 apt-get install -y --no-install-recommends lldpd
     # LLDP on by default (start now and at boot). CDP/FDP stay off -- opt-in via lldp-set.
     systemctl enable --now lldpd >/dev/null 2>&1 || true
     ;;  lldp-status)
