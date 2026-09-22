@@ -1969,6 +1969,106 @@ document.getElementById('haPromoteBtn').addEventListener('click', async () => {
   }
 });
 
+// ---------- High availability: node setup (no shell needed) ----------
+async function loadHaServiceStatus() {
+  const pill = document.getElementById('haServiceStatusPill');
+  try {
+    const status = await api.get('/api/ha/service-status');
+    if (!status.installed) {
+      pill.innerHTML = '<span class="pill mute"><span class="dot"></span>Not set up yet</span>';
+    } else if (status.active) {
+      pill.innerHTML = '<span class="pill ok"><span class="dot"></span>Running</span>';
+    } else if (status.enabled) {
+      pill.innerHTML = '<span class="pill warn"><span class="dot"></span>Installed, not started</span>';
+    } else {
+      pill.innerHTML = '<span class="pill warn"><span class="dot"></span>Installed, not enabled</span>';
+    }
+  } catch (err) {
+    pill.innerHTML = `<span class="pill bad"><span class="dot"></span>${escapeHtml(err.message)}</span>`;
+  }
+}
+
+document.getElementById('haServiceStatusBtn').addEventListener('click', () => loadHaServiceStatus());
+
+document.getElementById('haSetupBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('haSetupMsg');
+  msg.textContent = '';
+  try {
+    const result = await api.post('/api/ha/setup', {});
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Node setup complete.';
+    if (result.authorizedKeysLine) {
+      document.getElementById('haPubkeySection').hidden = false;
+      document.getElementById('haAuthorizedKeysLine').textContent = result.authorizedKeysLine;
+    }
+    await loadHaServiceStatus();
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('haStartServiceBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('haSetupMsg');
+  msg.textContent = '';
+  try {
+    await api.post('/api/ha/start-service', {});
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'HA agent service started.';
+    await loadHaServiceStatus();
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+let lastScannedPeerHostKey = null;
+
+document.getElementById('haScanPeerKeyBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('haPeerKeyMsg');
+  const host = document.getElementById('haPeerHostScan').value.trim();
+  msg.textContent = '';
+  document.getElementById('haPeerKeyResult').hidden = true;
+  lastScannedPeerHostKey = null;
+  if (!host) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Enter the peer host first.';
+    return;
+  }
+  try {
+    const result = await api.post('/api/ha/peer-hostkey/scan', { host });
+    lastScannedPeerHostKey = result.keyLine;
+    document.getElementById('haPeerKeyFingerprint').textContent = result.fingerprint;
+    document.getElementById('haPeerKeyResult').hidden = false;
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('haTrustPeerKeyBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('haPeerKeyMsg');
+  msg.textContent = '';
+  if (!lastScannedPeerHostKey) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Scan the peer\'s host key first.';
+    return;
+  }
+  if (!confirm('Trust this SSH host key for the peer? Only do this after confirming the fingerprint above matches the peer itself.')) {
+    return;
+  }
+  try {
+    await api.post('/api/ha/peer-hostkey/trust', { keyLine: lastScannedPeerHostKey });
+    msg.style.color = 'var(--ok)';
+    msg.textContent = 'Peer host key trusted.';
+    document.getElementById('haPeerKeyResult').hidden = true;
+    lastScannedPeerHostKey = null;
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
 // ---------- Two-factor auth (My Account) ----------
 function setTotpStatusUi(enabled) {
   const pill = document.getElementById('totpStatusPill');
@@ -2958,6 +3058,7 @@ async function initApp() {
   await loadSshSettings();
   await loadHaConfig();
   await loadHaStatus();
+  await loadHaServiceStatus();
   await loadTlsInfo();
   await loadVersion();
   await loadUpdateStatus();

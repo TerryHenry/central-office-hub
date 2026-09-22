@@ -625,8 +625,41 @@
 
       <div class="panel" id="haPanel">
         <h2>High Availability</h2>
-        <p class="hint">Configures the standalone <code>ha-agent</code> process on THIS node only -- the peer node needs its own matching configuration with role/host swapped. Saving writes <code>ha-agent/config.json</code> and, if the agent is already running here, tells it to reload live. A brand-new agent still needs its systemd service started once by hand -- see the README's "High Availability" section.</p>
+        <p class="hint">Configures the standalone <code>ha-agent</code> process on THIS node only -- the peer node needs its own matching configuration with role/host swapped.</p>
 
+        <h3>Node Setup</h3>
+        <p class="hint">One-time, privileged setup for this node (service account, systemd unit, dedicated SSH replication key) -- runs the same steps <code>provisioning/ha-setup.sh</code> always documented, through the app's own root helper, so no shell access to this VM is needed.</p>
+        <div class="field-row">
+          <button id="haSetupBtn">Set Up HA Agent on This Node</button>
+          <button id="haServiceStatusBtn" class="secondary">Refresh Service Status</button>
+          <span id="haServiceStatusPill"></span>
+        </div>
+        <div class="auth-error" id="haSetupMsg"></div>
+        <div id="haPubkeySection" hidden>
+          <p class="hint">This node's replication public key, ready to paste into the <strong>peer</strong> node's <code>central-office</code> account <code>~/.ssh/authorized_keys</code> (the peer needs a matching line of its own, pointing at its own data directory):</p>
+          <pre id="haAuthorizedKeysLine" class="code-block"></pre>
+        </div>
+        <div class="field-row">
+          <button id="haStartServiceBtn" class="secondary">Start HA Agent Service</button>
+        </div>
+
+        <p class="hint">Before replication can connect to the peer, this node must trust the peer's SSH host key once. Scan it, compare the fingerprint against the peer itself (e.g. its own Hub SSH Host Key panel, or a console session), then trust it -- this replaces the interactive "yes/no, are you sure" prompt ssh would normally show over a shell.</p>
+        <div class="field-row">
+          <label for="haPeerHostScan">Peer host</label>
+          <input type="text" id="haPeerHostScan" placeholder="10.0.0.6" autocomplete="off" />
+          <button id="haScanPeerKeyBtn" class="secondary">Scan Host Key</button>
+        </div>
+        <div id="haPeerKeyResult" hidden>
+          <p class="hint">Fingerprint (verify this matches the peer before trusting it):</p>
+          <pre id="haPeerKeyFingerprint" class="code-block"></pre>
+          <div class="field-row">
+            <button id="haTrustPeerKeyBtn">Trust This Key</button>
+          </div>
+        </div>
+        <div class="auth-error" id="haPeerKeyMsg"></div>
+
+        <h3>Configuration</h3>
+        <p class="hint">Saving writes <code>ha-agent/config.json</code> and, if the agent is already running here, tells it to reload live.</p>
         <div class="field-row">
           <label for="haEnabled">Enable HA on this node</label>
           <input type="checkbox" id="haEnabled" />
