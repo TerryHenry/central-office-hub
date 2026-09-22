@@ -202,9 +202,6 @@ code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overla
 .topology-node.hub { fill: var(--accent); stroke: var(--accent-hover); }
 .topology-node.online { fill: var(--ok); stroke: var(--ok); }
 .topology-node.offline { fill: var(--danger); stroke: var(--danger); }
-.topology-node.warn { fill: var(--warn); stroke: var(--warn); }
-.topology-node.standby { fill: var(--bg); stroke: var(--text-dim); }
-.topology-edge.ha-link { stroke-dasharray: 3 3; }
 
 .row-menu { position: relative; display: inline-block; }
 .row-menu-btn { padding: 3px 9px; font-size: 15px; line-height: 1.2; }

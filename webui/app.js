@@ -338,7 +338,6 @@ function commandVerificationPill(site) {
 // available (see configStore.recordHeartbeat) and fall back to the site's tunnel state
 // for older boxes that don't report it yet -- see the per-port logic below.
 let lastTopologySites = [];
-let lastTopologyHaStatus = { configured: false };
 
 // Delegated once on the (persistent) svg element -- its contents are rebuilt on every refresh.
 document.getElementById('topologySvg').addEventListener('click', (e) => {
@@ -348,10 +347,8 @@ document.getElementById('topologySvg').addEventListener('click', (e) => {
   window.open(url, '_blank', 'noopener');
 });
 
-function renderTopology(sites, haStatus) {
+function renderTopology(sites) {
   lastTopologySites = sites;
-  if (haStatus !== undefined) lastTopologyHaStatus = haStatus;
-  const ha = lastTopologyHaStatus;
   const svg = document.getElementById('topologySvg');
   const empty = document.getElementById('topologyEmpty');
   if (!sites.length) {
@@ -415,34 +412,10 @@ function renderTopology(sites, haStatus) {
     );
   };
 
-  const haConfigured = ha && ha.configured !== false;
-  const hubTitle = haConfigured
-    ? `Central Office — ${ha.isActive ? 'Active' : 'Standby'} (${ha.role === 'primary' ? 'Primary' : 'Secondary'})`
-    : 'Central Office';
   nodeParts.push(
-    `<circle class="topology-node hub" cx="${HUB_X}" cy="${hubY}" r="8"><title>${escapeHtml(hubTitle)}</title></circle>`
+    `<circle class="topology-node hub" cx="${HUB_X}" cy="${hubY}" r="8"><title>Central Office</title></circle>`
   );
   label(HUB_X + 14, hubY + 4, 'Central Office', { bold: true });
-
-  if (haConfigured) {
-    // A short dashed link straight above the hub node represents the standalone
-    // ha-agent pairing -- distinct from the solid site/port edges, since it's a
-    // control-plane health link, not a data tunnel. Color mirrors the same
-    // "consecutiveFailures === 0" healthy/unhealthy read used by the Account tab's
-    // High Availability panel, so the two views never disagree.
-    const peerY = hubY - 34;
-    const peerHealthy = ha.consecutiveFailures === 0;
-    const peerStatusClass = peerHealthy ? 'online' : 'warn';
-    const peerHealthText = peerHealthy
-      ? 'Healthy'
-      : `${ha.consecutiveFailures} consecutive check${ha.consecutiveFailures === 1 ? '' : 's'} failed`;
-    edgeParts.push(`<path class="topology-edge ha-link" d="M ${HUB_X} ${hubY} L ${HUB_X} ${peerY}" />`);
-    nodeParts.push(
-      `<circle class="topology-node ${peerStatusClass}" cx="${HUB_X}" cy="${peerY}" r="6"><title>Peer controller — ${escapeHtml(peerHealthText)}</title></circle>`
-    );
-    label(HUB_X + 14, peerY + 4, 'Peer Controller', { sub: true });
-    label(HUB_X + 14, hubY + 17, ha.isActive ? 'Active' : 'Standby', { sub: true });
-  }
 
   for (const { site, siteY, portYs } of siteLayout) {
     const statusClass = site.connected ? 'online' : 'offline';
@@ -1813,287 +1786,6 @@ document.getElementById('saveSshSettingsBtn').addEventListener('click', async ()
   }
 });
 
-// ---------- High availability ----------
-const HA_DEFAULTS = {
-  enabled: false,
-  mode: 'vip',
-  role: 'primary',
-  peerHost: '',
-  listenPort: 8555,
-  peerPort: 8555,
-  vip: { address: '', prefix: 24, interface: 'eth0' },
-  dns: { updateCommand: '' },
-  healthCheck: { intervalMs: 3000, failureThreshold: 3, timeoutMs: 2000 },
-  replication: { intervalMs: 5000, remoteDataDir: '/opt/central-office/data', sshUser: 'central-office', sshKeyPath: '/opt/central-office/ha-agent/replication-key' },
-  preemptOnRecovery: false
-};
-
-function applyHaModeVisibility() {
-  const mode = document.getElementById('haModeSelect').value;
-  document.getElementById('haVipFields').hidden = mode !== 'vip';
-  document.getElementById('haDnsFields').hidden = mode !== 'dns';
-}
-
-function fillHaConfigForm(cfg) {
-  document.getElementById('haEnabled').checked = !!cfg.enabled;
-  document.getElementById('haRoleSelect').value = cfg.role || 'primary';
-  document.getElementById('haModeSelect').value = cfg.mode || 'vip';
-  document.getElementById('haPeerHost').value = cfg.peerHost || '';
-  document.getElementById('haListenPort').value = cfg.listenPort || 8555;
-  document.getElementById('haPeerPort').value = cfg.peerPort || 8555;
-  const vip = cfg.vip || {};
-  document.getElementById('haVipAddress').value = vip.address || '';
-  document.getElementById('haVipPrefix').value = vip.prefix != null ? vip.prefix : 24;
-  document.getElementById('haVipInterface').value = vip.interface || 'eth0';
-  document.getElementById('haDnsCommand').value = (cfg.dns && cfg.dns.updateCommand) || '';
-  const hc = cfg.healthCheck || {};
-  document.getElementById('haHcInterval').value = hc.intervalMs || 3000;
-  document.getElementById('haHcThreshold').value = hc.failureThreshold || 3;
-  document.getElementById('haHcTimeout').value = hc.timeoutMs || 2000;
-  const rep = cfg.replication || {};
-  document.getElementById('haRepInterval').value = rep.intervalMs || 5000;
-  document.getElementById('haRepRemoteDir').value = rep.remoteDataDir || '';
-  document.getElementById('haRepSshUser').value = rep.sshUser || '';
-  document.getElementById('haRepSshKey').value = rep.sshKeyPath || '';
-  document.getElementById('haPreempt').checked = !!cfg.preemptOnRecovery;
-  applyHaModeVisibility();
-}
-
-function readHaConfigForm() {
-  return {
-    enabled: document.getElementById('haEnabled').checked,
-    role: document.getElementById('haRoleSelect').value,
-    mode: document.getElementById('haModeSelect').value,
-    peerHost: document.getElementById('haPeerHost').value.trim(),
-    listenPort: Number(document.getElementById('haListenPort').value),
-    peerPort: Number(document.getElementById('haPeerPort').value),
-    vip: {
-      address: document.getElementById('haVipAddress').value.trim(),
-      prefix: Number(document.getElementById('haVipPrefix').value),
-      interface: document.getElementById('haVipInterface').value.trim()
-    },
-    dns: { updateCommand: document.getElementById('haDnsCommand').value.trim() },
-    healthCheck: {
-      intervalMs: Number(document.getElementById('haHcInterval').value),
-      failureThreshold: Number(document.getElementById('haHcThreshold').value),
-      timeoutMs: Number(document.getElementById('haHcTimeout').value)
-    },
-    replication: {
-      intervalMs: Number(document.getElementById('haRepInterval').value),
-      remoteDataDir: document.getElementById('haRepRemoteDir').value.trim(),
-      sshUser: document.getElementById('haRepSshUser').value.trim(),
-      sshKeyPath: document.getElementById('haRepSshKey').value.trim()
-    },
-    preemptOnRecovery: document.getElementById('haPreempt').checked
-  };
-}
-
-async function loadHaConfig() {
-  const cfg = await api.get('/api/ha/config');
-  fillHaConfigForm(cfg.configured === false ? HA_DEFAULTS : cfg);
-}
-
-document.getElementById('haModeSelect').addEventListener('change', applyHaModeVisibility);
-
-document.getElementById('haReloadConfigBtn').addEventListener('click', () => {
-  const msg = document.getElementById('haConfigMsg');
-  msg.textContent = '';
-  loadHaConfig().catch((err) => {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  });
-});
-
-document.getElementById('haSaveConfigBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('haConfigMsg');
-  msg.textContent = '';
-  try {
-    const result = await api.post('/api/ha/config', readHaConfigForm());
-    msg.style.color = 'var(--ok)';
-    msg.textContent = result.agentNotified
-      ? 'Saved and applied live to the running ha-agent.'
-      : 'Saved. The ha-agent on this node is not reachable yet -- start its systemd service to apply this (see README).';
-    await loadHaStatus();
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-async function loadHaStatus() {
-  const status = await api.get('/api/ha/status');
-  renderTopology(lastTopologySites, status);
-  const section = document.getElementById('haStatusSection');
-  if (status.configured === false) {
-    section.hidden = true;
-    return;
-  }
-  section.hidden = false;
-  document.getElementById('haRole').textContent = status.role === 'primary' ? 'Primary' : 'Secondary';
-  document.getElementById('haIsActive').innerHTML = status.isActive
-    ? '<span class="pill ok"><span class="dot"></span>Active</span>'
-    : '<span class="pill mute"><span class="dot"></span>Standby</span>';
-  document.getElementById('haMode').textContent = status.mode === 'vip' ? 'Virtual IP' : 'DNS update';
-  const peerHealthy = status.consecutiveFailures === 0;
-  document.getElementById('haPeerHealth').innerHTML = peerHealthy
-    ? '<span class="pill ok"><span class="dot"></span>Healthy</span>'
-    : `<span class="pill warn"><span class="dot"></span>${status.consecutiveFailures} consecutive check${status.consecutiveFailures === 1 ? '' : 's'} failed</span>`;
-  document.getElementById('haLastReplication').innerHTML = status.isActive
-    ? '<span class="hint">n/a -- this node is active, it does not pull</span>'
-    : status.lastReplicationAt
-      ? `${new Date(status.lastReplicationAt).toLocaleString()}${status.lastReplicationError ? ` <span class="pill warn">last attempt failed: ${escapeHtml(status.lastReplicationError)}</span>` : ''}`
-      : '<span class="hint">never</span>';
-  document.getElementById('haPromotedAt').textContent = status.promotedAt ? new Date(status.promotedAt).toLocaleString() : 'never';
-  // Reclaiming only makes sense from a node that's currently standby -- promoting an
-  // already-active node is a no-op the agent itself already guards, but hiding the
-  // button here avoids implying there's something to reclaim when there isn't.
-  document.getElementById('haPromoteBtn').hidden = status.isActive;
-}
-
-document.getElementById('haRefreshBtn').addEventListener('click', () => loadHaStatus().catch((err) => alert(err.message)));
-
-document.getElementById('haPromoteBtn').addEventListener('click', async () => {
-  if (!confirm('Reclaim the primary role on this node? This claims the virtual IP (or updates DNS) and starts the main service here -- only do this once you\'re sure the other node has actually stepped down, to avoid both nodes being active at once.')) {
-    return;
-  }
-  const msg = document.getElementById('haMsg');
-  msg.textContent = '';
-  try {
-    await api.post('/api/ha/promote');
-    msg.style.color = 'var(--ok)';
-    msg.textContent = 'Promotion requested.';
-    await loadHaStatus();
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-// ---------- High availability: node setup (no shell needed) ----------
-async function loadHaServiceStatus() {
-  const pill = document.getElementById('haServiceStatusPill');
-  try {
-    const status = await api.get('/api/ha/service-status');
-    if (!status.installed) {
-      pill.innerHTML = '<span class="pill mute"><span class="dot"></span>Not set up yet</span>';
-    } else if (status.active) {
-      pill.innerHTML = '<span class="pill ok"><span class="dot"></span>Running</span>';
-    } else if (status.enabled) {
-      pill.innerHTML = '<span class="pill warn"><span class="dot"></span>Installed, not started</span>';
-    } else {
-      pill.innerHTML = '<span class="pill warn"><span class="dot"></span>Installed, not enabled</span>';
-    }
-  } catch (err) {
-    pill.innerHTML = `<span class="pill bad"><span class="dot"></span>${escapeHtml(err.message)}</span>`;
-  }
-}
-
-document.getElementById('haServiceStatusBtn').addEventListener('click', () => loadHaServiceStatus());
-
-document.getElementById('haSetupBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('haSetupMsg');
-  msg.textContent = '';
-  try {
-    const result = await api.post('/api/ha/setup', {});
-    msg.style.color = 'var(--ok)';
-    msg.textContent = 'Node setup complete.';
-    if (result.authorizedKeysLine) {
-      document.getElementById('haPubkeySection').hidden = false;
-      document.getElementById('haAuthorizedKeysLine').textContent = result.authorizedKeysLine;
-    }
-    // Setup just granted this app's service account new group access -- a running
-    // process doesn't pick that up until it restarts, so config saves would 403/EACCES
-    // until then.
-    document.getElementById('haRestartNeeded').hidden = false;
-    await loadHaServiceStatus();
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-document.getElementById('haRestartServiceBtn').addEventListener('click', async () => {
-  if (!confirm('Restart the service now? Active tunnels and web/SSH sessions will briefly disconnect. This finishes HA setup by letting the service pick up the permissions it was just granted.')) return;
-  const msg = document.getElementById('haSetupMsg');
-  msg.style.color = 'var(--text-dim)';
-  msg.textContent = 'Restarting…';
-  try {
-    await api.post('/api/system/restart-service');
-    const backUp = await pollUntilBackUp(() => {
-      msg.textContent = 'Waiting for the service to come back...';
-    });
-    msg.style.color = backUp ? 'var(--ok)' : 'var(--danger)';
-    msg.textContent = backUp
-      ? 'Service restarted. HA setup is complete -- Save Configuration should work now.'
-      : 'Restart requested, but the service did not come back within the timeout -- check it directly.';
-    if (backUp) document.getElementById('haRestartNeeded').hidden = true;
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-document.getElementById('haStartServiceBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('haSetupMsg');
-  msg.textContent = '';
-  try {
-    await api.post('/api/ha/start-service', {});
-    msg.style.color = 'var(--ok)';
-    msg.textContent = 'HA agent service started.';
-    await loadHaServiceStatus();
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-let lastScannedPeerHostKey = null;
-
-document.getElementById('haScanPeerKeyBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('haPeerKeyMsg');
-  const host = document.getElementById('haPeerHostScan').value.trim();
-  msg.textContent = '';
-  document.getElementById('haPeerKeyResult').hidden = true;
-  lastScannedPeerHostKey = null;
-  if (!host) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = 'Enter the peer host first.';
-    return;
-  }
-  try {
-    const result = await api.post('/api/ha/peer-hostkey/scan', { host });
-    lastScannedPeerHostKey = result.keyLine;
-    document.getElementById('haPeerKeyFingerprint').textContent = result.fingerprint;
-    document.getElementById('haPeerKeyResult').hidden = false;
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
-document.getElementById('haTrustPeerKeyBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('haPeerKeyMsg');
-  msg.textContent = '';
-  if (!lastScannedPeerHostKey) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = 'Scan the peer\'s host key first.';
-    return;
-  }
-  if (!confirm('Trust this SSH host key for the peer? Only do this after confirming the fingerprint above matches the peer itself.')) {
-    return;
-  }
-  try {
-    await api.post('/api/ha/peer-hostkey/trust', { keyLine: lastScannedPeerHostKey });
-    msg.style.color = 'var(--ok)';
-    msg.textContent = 'Peer host key trusted.';
-    document.getElementById('haPeerKeyResult').hidden = true;
-    lastScannedPeerHostKey = null;
-  } catch (err) {
-    msg.style.color = 'var(--danger)';
-    msg.textContent = err.message;
-  }
-});
-
 // ---------- Two-factor auth (My Account) ----------
 function setTotpStatusUi(enabled) {
   const pill = document.getElementById('totpStatusPill');
@@ -3081,9 +2773,6 @@ async function initApp() {
   await loadTotpStatus();
   await loadHostKeyFingerprint();
   await loadSshSettings();
-  await loadHaConfig();
-  await loadHaStatus();
-  await loadHaServiceStatus();
   await loadTlsInfo();
   await loadVersion();
   await loadUpdateStatus();

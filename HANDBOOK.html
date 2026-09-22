@@ -420,7 +420,6 @@
     <div class="group-label">Reference</div>
     <ul>
       <li><a href="#access-modes">Access modes &amp; permissions</a></li>
-      <li><a href="#high-availability">High availability</a></li>
       <li><a href="#security">Security notes</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ul>
@@ -471,7 +470,6 @@
       <div class="card">
         <h4>Fleet Topology</h4>
         <p>A live diagram: hub &rarr; each enrolled site &rarr; that site's reported ports. Node color reflects real reachability, not just enrollment &mdash; a site node is red if its tunnel is down, and a port node is red if the site is online but that specific device isn't plugged in (when the site's firmware reports port presence; older sites without that just show reachable-or-not by tunnel state alone). Hover any node for detail.</p>
-        <p>If this hub has <a href="#high-availability">High Availability</a> configured, a second node appears directly above the hub's own, linked by a dashed line: the paired controller. It shows whether <em>this</em> node is currently Active or Standby, and whether the health link to its peer is currently healthy.</p>
       </div>
       <div class="card">
         <h4>System Information</h4>
@@ -612,10 +610,6 @@
         <p>The one port every enrolled site's tunnel connects to (and an admin-tunnel SSH session uses too) &mdash; default <code>443</code>, changeable here if this network needs something else. Saving only persists the new value; it takes effect on the next restart (TLS Certificate panel's <strong>Restart Service Now</strong>, or any other restart). Once that happens, every currently-connected site's tunnel drops immediately, and each one needs its own Central Office panel's Tunnel Port updated to match before it can reconnect &mdash; this is a fleet-wide change, not a hub-only setting, so treat it as a coordinated migration rather than a quick toggle. A site's enrollment, heartbeat, and config-backup traffic all prefer riding over this same tunnel (see the TLS Certificate note below), falling back to the web API port only when the tunnel can't be reached at that moment &mdash; so in practice this is the only port a fleet needs open on an ongoing basis, enrollment included.</p>
       </div>
       <div class="card">
-        <h4 id="high-availability-inner">High Availability</h4>
-        <p>Configures and shows the status of the standalone <code>ha-agent</code> process on <em>this</em> node &mdash; see <a href="#high-availability">High availability</a> below for the full picture. In short: fill in this node's role, peer, and failover mode here and click <strong>Save Configuration</strong>; it writes the agent's config and applies most changes live, no restart needed.</p>
-      </div>
-      <div class="card">
         <h4>TLS Certificate</h4>
         <p>Covers this admin UI's own HTTPS certificate. A self-signed one is generated automatically on first boot; upload your own to replace it. The fingerprint shown here is also what a site should pin as its own <strong>Hub TLS certificate fingerprint</strong>, separate from the SSH host key above &mdash; it protects a different set of calls (enrollment, the heartbeat, and config backups) whenever they end up talking to this hub's web API port directly instead of through its tunnel listener. All three prefer the tunnel first now &mdash; enrollment over a short-lived, token-authenticated connection; heartbeat and backup over an already-enrolled site's own persistent tunnel &mdash; falling back to a direct call to the web API port only when the tunnel can't be reached at that moment (including a site's very first heartbeat, in the brief window before its tunnel finishes connecting).</p>
       </div>
@@ -660,30 +654,6 @@
       <p>Layered on top of that, independently, is the hub's own <strong>read-write / read-only</strong> permission per grant (see <a href="#tab-groups">Groups</a>). A read-only grant still lets a user open a session and watch the port's output, but their own keystrokes are never forwarded to the device &mdash; they'll see <em>"This session is read-only; your input will not be sent to the port"</em> right in the session, and the one exception is the detach key (<kbd>Ctrl</kbd>+<kbd>]</kbd>), which always works so a read-only session can still be left cleanly.</p>
     </section>
 
-    <section id="high-availability">
-      <h2>High availability</h2>
-      <p class="lede">Optional automatic failover across two hub VMs, so the hub itself isn't a single point of failure for the whole fleet. A standalone <code>ha-agent</code> process runs on both nodes at all times, independent of the main hub app: it health-checks its peer, and if the peer goes unreachable past a threshold, promotes itself &mdash; final data pull, claim the shared address (or update DNS), start the hub service.</p>
-      <div class="card">
-        <h4>Configuring it</h4>
-        <p>Everything is set from <strong>System &rarr; High Availability</strong> on each node &mdash; no file to hand-edit. Fill in:</p>
-        <ul>
-          <li><strong>Role</strong> &mdash; Primary on one VM, Secondary on the other.</li>
-          <li><strong>Failover mode</strong> &mdash; <strong>Virtual IP</strong> (a floating address that moves between nodes on the same network segment, fails over in seconds) or <strong>DNS update</strong> (runs a script you supply to repoint your own DNS record, works across subnets but is only as fast as DNS caching allows).</li>
-          <li><strong>Peer host</strong> and both agent ports &mdash; how the two nodes find each other's health-check endpoint.</li>
-          <li>Health-check and replication timing, and whether a recovered node should <strong>auto-reclaim</strong> the primary role or wait for you to click <strong>Reclaim Primary Role</strong> yourself (the default &mdash; avoids flapping between two nodes on a flaky link).</li>
-        </ul>
-        <p><strong>Save Configuration</strong> writes the change and, if the agent is already running on that node, applies it live &mdash; enabling/disabling, timing, and mode changes take effect immediately, no restart. A brand-new setup still needs the agent's own service started once by hand on each VM.</p>
-      </div>
-      <div class="callout warn">
-        <span class="mark">Per-node, not shared</span>
-        <p>Each node's configuration is its own &mdash; role, peer address, and which side owns the virtual IP are necessarily different on the two VMs. Configure each one separately with its own (mirrored) values.</p>
-      </div>
-      <div class="card">
-        <h4>Watching it</h4>
-        <p>The same panel's status section shows this node's current role (Active/Standby), peer health, and last replication time. The <a href="#tab-dashboard">Dashboard</a>'s fleet topology diagram also shows a small linked node above the hub for an at-a-glance check without switching tabs.</p>
-      </div>
-    </section>
-
     <section id="security">
       <h2>Security notes</h2>
       <ul>
@@ -709,10 +679,6 @@
       <div class="card">
         <h4>A port shows red even though the site is Online</h4>
         <p>That port's device isn't currently present on the site (only shown when the site's firmware reports port presence &mdash; older sites just reflect the site's own connection state for every port).</p>
-      </div>
-      <div class="card">
-        <h4>High Availability panel doesn't show a status section</h4>
-        <p>That node's <code>ha-agent</code> hasn't written a status file yet &mdash; either it isn't running, or it just started. The configuration form above it still works regardless, so you can prepare the config before the agent's service is even started.</p>
       </div>
     </section>
 
