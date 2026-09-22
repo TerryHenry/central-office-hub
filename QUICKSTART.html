@@ -298,8 +298,8 @@
     </li>
     <li>
       <h3>Add a console user and connect</h3>
-      <p><strong>Users</strong> tab &rarr; <strong>+ Add User</strong> &rarr; set a password and assign the group you just created &rarr; <strong>Save</strong>. From any machine on the network:</p>
-      <pre class="term">ssh -p 2222 <span class="c2">&lt;username&gt;</span>@&lt;hub-host&gt;</pre>
+      <p><strong>Users</strong> tab &rarr; <strong>+ Add User</strong> &rarr; set a password and assign the group you just created &rarr; <strong>Save</strong>. From any machine on the network, using this hub's Tunnel/SSH Listener port (<strong>443</strong> by default &mdash; see Admin Accounts &rarr; Tunnel/SSH Listener if it's been changed):</p>
+      <pre class="term">ssh -p 443 <span class="c2">&lt;username&gt;</span>@&lt;hub-host&gt;</pre>
       <p>The port menu lists exactly what that user's groups grant &mdash; nothing more.</p>
     </li>
   </ol>
