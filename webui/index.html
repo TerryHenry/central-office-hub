@@ -12,9 +12,9 @@
     <form class="auth-card" id="loginForm">
       <h1>Central Office</h1>
       <label>Username</label>
-      <input type="text" id="loginUsername" required />
+      <input type="text" id="loginUsername" required autocomplete="username" />
       <label>Password</label>
-      <input type="password" id="loginPassword" required />
+      <input type="password" id="loginPassword" required autocomplete="current-password" />
       <div class="auth-error" id="loginError"></div>
       <button type="submit" class="primary">Sign In</button>
     </form>
@@ -38,11 +38,26 @@
       <h1>Change the default password</h1>
       <p class="hint">This account is still using the default password. Choose a new one to continue.</p>
       <label>New password <span class="hint" id="forceChangePasswordHint"></span></label>
-      <input type="password" id="forceChangePassword" minlength="8" required />
+      <input type="password" id="forceChangePassword" minlength="8" required autocomplete="new-password" />
       <label>Confirm password</label>
-      <input type="password" id="forceChangePasswordConfirm" minlength="8" required />
+      <input type="password" id="forceChangePasswordConfirm" minlength="8" required autocomplete="new-password" />
       <div class="auth-error" id="forceChangeError"></div>
       <button type="submit" class="primary">Set Password &amp; Continue</button>
+    </form>
+  </div>
+
+  <!-- Forced 2FA enrollment: shown after logging in when the password policy requires
+       two-factor authentication for admins and this account hasn't set it up yet -->
+  <div class="auth-screen" id="force2faScreen">
+    <form class="auth-card" id="force2faForm">
+      <h1>Set up two-factor authentication</h1>
+      <p class="hint">This hub requires two-factor authentication on every admin account. Scan this code with an authenticator app (Google Authenticator, Authy, 1Password, etc.), then enter the 6-digit code it generates to continue.</p>
+      <div id="force2faQrContainer"></div>
+      <p class="hint">Or enter this secret manually: <code id="force2faSecretText"></code></p>
+      <label>Code</label>
+      <input type="text" id="force2faCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required />
+      <div class="auth-error" id="force2faError"></div>
+      <button type="submit" class="primary">Verify &amp; Continue</button>
     </form>
   </div>
 
@@ -53,16 +68,105 @@
       <button id="logoutBtn" class="secondary">Sign Out</button>
     </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="sites">Sites</button>
-      <button class="tab-btn" data-tab="users">Users</button>
-      <button class="tab-btn" data-tab="groups">Groups</button>
-      <button class="tab-btn" data-tab="sessions">Sessions</button>
-      <button class="tab-btn" data-tab="log">Log</button>
-      <button class="tab-btn" data-tab="account">Account</button>
+    <div class="app-body">
+      <nav class="sidebar">
+        <div class="sidebar-main">
+          <div class="nav-group">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">Fleet &amp; Access</div>
+            <button class="tab-btn" data-tab="sites">Sites</button>
+            <button class="tab-btn" data-tab="batch">Batch</button>
+            <button class="tab-btn" data-tab="users">Users</button>
+            <button class="tab-btn" data-tab="groups">Groups</button>
+            <button class="tab-btn" data-tab="sessions">Sessions</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">This hub</div>
+            <button class="tab-btn" data-tab="network">Network</button>
+            <button class="tab-btn" data-tab="tftp">TFTP</button>
+            <button class="tab-btn" data-tab="system">System</button>
+            <button class="tab-btn" data-tab="log">Log</button>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">Security</div>
+            <button class="tab-btn" data-tab="account">Admin Accounts</button>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <button class="tab-btn" data-tab="about">About</button>
+          <button class="tab-btn" data-tab="help">Help</button>
+        </div>
+      </nav>
+
+      <main class="tab-panel-area">
+    <div class="tab-content active" id="tab-dashboard">
+      <div class="panel">
+        <h2>System</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">CPU</span>
+            <span class="stat-value" id="statCpu">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statCpuBar"></div></div>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Memory</span>
+            <span class="stat-value" id="statMem">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statMemBar"></div></div>
+            <span class="stat-sub" id="statMemSub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Disk</span>
+            <span class="stat-value" id="statDisk">&mdash;</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statDiskBar"></div></div>
+            <span class="stat-sub" id="statDiskSub"></span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Uptime</span>
+            <span class="stat-value" id="systemUptime">&mdash;</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Connected Clients</span>
+            <span class="stat-value" id="statClients">&mdash;</span>
+            <span class="stat-sub">SSH + web console sessions to this hub</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Fleet Topology</h2>
+        <p class="hint">Hub &rarr; sites &rarr; their reported ports. Updates live as sites connect, disconnect, or report new ports.</p>
+        <div class="topology-legend">
+          <span class="topology-legend-item"><span class="topology-dot online"></span>Online</span>
+          <span class="topology-legend-item"><span class="topology-dot offline"></span>Offline</span>
+        </div>
+        <div class="topology-wrap" id="topologyWrap">
+          <p class="hint" id="topologyEmpty">No sites enrolled yet.</p>
+          <svg id="topologySvg" hidden></svg>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>System Information</h2>
+        <table class="data-table" id="systemInfoTable">
+          <tbody>
+            <tr><th>Hostname</th><td id="infoHostname">&mdash;</td></tr>
+            <tr><th>Operating System</th><td id="infoOsRelease">&mdash;</td></tr>
+            <tr><th>Kernel</th><td id="infoKernel">&mdash;</td></tr>
+            <tr><th>Architecture</th><td id="infoArch">&mdash;</td></tr>
+            <tr><th>CPU</th><td id="infoCpu">&mdash;</td></tr>
+            <tr><th>Total Memory</th><td id="infoMemory">&mdash;</td></tr>
+            <tr><th>Disk</th><td id="infoDisk">&mdash;</td></tr>
+            <tr><th>Node.js</th><td id="infoNode">&mdash;</td></tr>
+            <tr><th>App Version</th><td id="infoAppVersion">&mdash;</td></tr>
+          </tbody>
+        </table>
+        <button id="refreshSystemInfoBtn">Refresh</button>
+      </div>
     </div>
 
-    <div class="tab-content active" id="tab-sites">
+    <div class="tab-content" id="tab-sites">
       <div class="panel">
         <h2>Sites</h2>
         <p class="hint">Each site is one enrolled edge box, identified by its tunnel public key. Its ports are reported automatically by heartbeat (every 30s, while it's in managed mode) &mdash; nothing to enter by hand.</p>
@@ -71,18 +175,19 @@
           <tbody></tbody>
         </table>
         <div class="field-row">
-          <button id="addSiteBtn">+ Add Site</button>
           <button id="bulkQueueUpdateBtn">Upgrade Version for Selected</button>
           <button id="bulkSyncAdminsBtn" class="danger">Sync Admins for Selected</button>
+          <button id="bulkSyncUsersBtn">Sync Users for Selected</button>
+          <button id="bulkTftpUploadBtn" class="secondary">Upload to TFTP for Selected</button>
           <button id="revealPortIdsBtn" class="secondary">Reveal Port IDs</button>
         </div>
       </div>
 
       <div class="panel">
         <h2>Enrollment Tokens</h2>
-        <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it without copying its public key by hand.</p>
+        <p class="hint">Generate a token and paste it into an edge box's Central Office panel to enroll it. To replace a box that failed, use <strong>Re-enroll</strong> on its row in the Sites list instead, so the new box keeps that site's ports and grants.</p>
         <table class="data-table" id="tokensTable">
-          <thead><tr><th>Site name</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Site name</th><th>Token</th><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <button id="addTokenBtn">+ Generate Token</button>
@@ -94,10 +199,17 @@
         <h2>Console Users</h2>
         <p class="hint">Console users reach ports through group grants only &mdash; they never see the admin UI. They can connect over SSH (any username other than an admin's or <code>_edge</code>) or the web console at <code>/terminal</code>.</p>
         <table class="data-table" id="usersTable">
-          <thead><tr><th>Username</th><th>Groups</th><th></th></tr></thead>
+          <thead><tr><th>Username</th><th>Groups</th><th>Capture</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
-        <button id="addUserBtn">+ Add User</button>
+        <div class="field-row">
+          <button id="addUserBtn">+ Add User</button>
+          <input type="file" id="importUsersInput" accept=".csv,text/csv" hidden />
+          <button id="importUsersBtn" class="secondary">Import from CSV&hellip;</button>
+          <button id="downloadUserTemplateBtn" class="secondary">Download CSV Template</button>
+        </div>
+        <p class="hint">CSV columns: <code>username, password, groups, capture</code>. <code>groups</code> is a semicolon- or comma-separated list of existing group names (unrecognized names are ignored, noted in the import summary). <code>capture</code> is <code>yes</code>/<code>true</code>/<code>1</code> to always capture this user's sessions (defaults to off). Only creates new accounts &mdash; a username that already exists is skipped, never overwritten.</p>
+        <div class="auth-error" id="importUsersMsg"></div>
       </div>
     </div>
 
@@ -113,21 +225,552 @@
       </div>
     </div>
 
+    <div class="tab-content" id="tab-network">
+      <div class="panel">
+        <h2>Interfaces</h2>
+        <table class="data-table" id="networkInterfacesTable">
+          <thead><tr><th>Interface</th><th>Type</th><th>Status</th><th>IP Address</th><th>Connection</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="networkInterfacesEmpty">No network interfaces detected.</p>
+        <div class="field-row">
+          <label>Public IP</label>
+          <span id="publicIpValue">&mdash;</span>
+        </div>
+        <div class="field-row">
+          <button id="refreshNetworkBtn">Refresh</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Neighbor Discovery (LLDP / CDP / FDP)</h2>
+        <p class="hint">Runs <code>lldpd</code> so this host announces itself to, and learns from, the switch it is plugged into &mdash; showing which switch and port each interface connects to. Optional CDP (Cisco) and FDP (Foundry/Brocade) support lets it hear switches that don't speak LLDP.</p>
+        <div class="field-row">
+          <label for="lldpEnabled">Enable LLDP</label>
+          <input type="checkbox" id="lldpEnabled" />
+          <span class="status-pill" id="lldpStatusPill"><span class="dot"></span><span id="lldpStatusText">&mdash;</span></span>
+        </div>
+        <div class="field-row">
+          <label for="lldpCdp">Also listen for CDP</label>
+          <input type="checkbox" id="lldpCdp" />
+        </div>
+        <div class="field-row">
+          <label for="lldpFdp">Also listen for FDP</label>
+          <input type="checkbox" id="lldpFdp" />
+        </div>
+        <div class="field-row">
+          <button id="saveLldpBtn" class="primary">Apply</button>
+          <button id="refreshLldpBtn" class="secondary">Refresh Neighbors</button>
+          <span class="auth-error" id="lldpMsg"></span>
+        </div>
+        <table class="data-table" id="lldpNeighborsTable">
+          <thead><tr><th>Local Interface</th><th>Protocol</th><th>Neighbor</th><th>Neighbor Port</th><th>Mgmt IP</th><th>VLAN</th><th>Capabilities</th><th>Age</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="lldpNeighborsEmpty">No neighbors discovered yet.</p>
+      </div>
+      <div class="panel">
+        <h2>Static IP</h2>
+        <p class="hint">Relies on NetworkManager (<code>nmcli</code>). If this host doesn't run NetworkManager (common on a minimal Debian/cloud VM), saving here will show a clear error instead of silently doing nothing.</p>
+        <div class="field-row">
+          <label for="staticIpDevice">Interface</label>
+          <select id="staticIpDevice"></select>
+          <span class="status-pill" id="staticIpModePill">
+            <span class="dot"></span>
+            <span id="staticIpModeText">&mdash;</span>
+          </span>
+        </div>
+        <div class="field-row">
+          <label for="staticIpAddress">IP Address</label>
+          <input type="text" id="staticIpAddress" placeholder="192.168.1.50" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="staticIpMask">Subnet Mask</label>
+          <input type="text" id="staticIpMask" placeholder="255.255.255.0" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="staticIpGateway">Gateway</label>
+          <input type="text" id="staticIpGateway" placeholder="192.168.1.1" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <button id="saveStaticIpBtn" class="primary">Save</button>
+          <button id="clearStaticIpBtn" class="secondary">Use DHCP</button>
+        </div>
+        <p class="hint">A wrong address, mask, or gateway here can disconnect this interface from the network entirely, including cutting off the admin UI if you're reaching it through this interface. Double-check before saving &mdash; recovery needs SSH (via a different interface, if there is one) or the physical/hypervisor console.</p>
+        <div class="auth-error" id="staticIpMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Time &amp; DNS</h2>
+        <div class="field-row">
+          <label for="ntpServer">NTP Server</label>
+          <input type="text" id="ntpServer" placeholder="pool.ntp.org" autocomplete="off" />
+          <span class="status-pill" id="ntpSyncPill">
+            <span class="dot"></span>
+            <span id="ntpSyncText">Unknown</span>
+          </span>
+          <button id="saveNtpBtn">Save</button>
+        </div>
+        <div class="field-row">
+          <label for="timezoneInput">Timezone</label>
+          <select id="timezoneInput"></select>
+          <button id="saveTimezoneBtn">Save</button>
+        </div>
+        <div class="field-row">
+          <label for="dnsServers">DNS Servers</label>
+          <input type="text" id="dnsServers" placeholder="e.g. 1.1.1.1, 8.8.8.8" autocomplete="off" />
+          <button id="saveDnsBtn">Save</button>
+          <button id="clearDnsBtn" class="secondary">Use DHCP</button>
+        </div>
+        <p class="hint">IPv4 addresses only. DNS Servers shows what's currently in effect. Leave it as-is (or click Use DHCP) to keep using whatever your network hands out automatically.</p>
+        <div class="auth-error" id="timeDnsMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>System Control</h2>
+        <div class="field-row">
+          <label for="systemHostname">Hostname</label>
+          <input type="text" id="systemHostname" autocomplete="off" />
+          <button id="saveHostnameBtn">Save</button>
+        </div>
+        <div class="auth-error" id="systemControlMsg"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-tftp">
+      <div class="panel">
+        <h2>TFTP Server</h2>
+        <p class="hint">Off by default. Useful for pushing firmware or config files to network devices reachable from this hub.</p>
+        <div class="field-row">
+          <span>Status</span>
+          <span class="status-pill" id="tftpStatusPill">
+            <span class="dot"></span>
+            <span id="tftpStatusText">Stopped</span>
+          </span>
+          <button id="toggleTftpBtn" class="primary">Start Server</button>
+        </div>
+        <div class="field-row">
+          <label for="tftpPort">Listen Port</label>
+          <input type="number" id="tftpPort" min="1" max="65535" />
+        </div>
+        <div class="field-row">
+          <label for="tftpAllowUpload">Allow uploads</label>
+          <input type="checkbox" id="tftpAllowUpload" />
+        </div>
+        <div class="field-row">
+          <label for="tftpAutoStart">Start automatically on boot</label>
+          <input type="checkbox" id="tftpAutoStart" />
+        </div>
+        <div class="field-row">
+          <button id="saveTftpSettingsBtn">Save Settings</button>
+        </div>
+        <div class="field-row column">
+          <label>Root directory</label>
+          <pre class="code-block" id="tftpRootDir">/opt/central-office/data/tftp</pre>
+        </div>
+        <p class="hint">Changing the listen port requires stopping and starting the server. The standard TFTP port (69) needs no extra privileges here &mdash; the service is granted that capability directly.</p>
+      </div>
+
+      <div class="panel">
+        <h2>TFTP Directory</h2>
+        <table class="data-table" id="tftpFilesTable">
+          <thead><tr><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="tftpFilesEmpty">No files yet.</p>
+        <input type="file" id="tftpUploadInput" hidden />
+        <button id="tftpUploadBtn">+ Upload File</button>
+        <div class="auth-error" id="tftpUploadMsg"></div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-sessions">
       <div class="panel">
         <h2>Active Sessions</h2>
         <p class="hint">SSH and web console sessions, shown together.</p>
         <table class="data-table" id="sessionsTable">
-          <thead><tr><th>User</th><th>Method</th><th>Connected To</th><th>Since</th><th></th></tr></thead>
+          <thead><tr><th>User</th><th>Method</th><th>Connected To</th><th>Since</th><th>Traffic (RX / TX)</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
+
+      <div class="panel">
+        <h2>Session Captures</h2>
+        <p class="hint">Byte-for-byte logs of past sessions for users with capture enabled (Users tab).</p>
+        <table class="data-table" id="capturesTable">
+          <thead><tr><th>File</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="capturesEmpty">No captures yet.</p>
+        <button id="refreshCapturesBtn">Refresh</button>
+      </div>
     </div>
 
+    <div class="tab-content" id="tab-batch">
+      <div class="panel">
+        <h2>Run a Batch</h2>
+        <p class="hint">Types a script into the console of every port you choose &mdash; for example to log in and reboot, factory-reset, or upgrade many devices at once &mdash; and keeps a record of each device. Runs from this hub over the same connection a web console uses, so a port that someone else has open (exclusive access) will fail with that reason.</p>
+        <div class="field-row">
+          <label for="batchName">Name</label>
+          <input type="text" id="batchName" placeholder="e.g. Reboot lab switches" autocomplete="off" style="width: 22em" />
+        </div>
+        <div class="field-row">
+          <select id="batchPreset"></select>
+          <select id="batchTemplate"></select>
+          <button id="batchSaveTemplateBtn" type="button" class="secondary">Save script&hellip;</button>
+          <button id="batchDeleteTemplateBtn" type="button" class="secondary">Delete saved</button>
+        </div>
+        <div class="field-row column">
+          <label for="batchScript">Script <span class="hint">(one step per line)</span></label>
+          <textarea id="batchScript" class="batch-script" rows="12" spellcheck="false" placeholder="login {{username}} {{password}}&#10;show version"></textarea>
+          <details class="batch-help">
+            <summary>Script reference</summary>
+            <table class="data-table">
+              <tbody>
+                <tr><td><code>login &lt;user&gt; &lt;password&gt;</code></td><td>Log in. Skips itself if a prompt is already showing. Fails if the device rejects the login.</td></tr>
+                <tr><td><code>send &lt;text&gt;</code></td><td>Type the text and press Enter. A bare <code>send</code> just presses Enter. Any line that isn't one of these keywords is treated as <code>send</code>.</td></tr>
+                <tr><td><code>send-raw &lt;text&gt;</code></td><td>Type the text with no Enter. Escapes: <code>&#92;r &#92;n &#92;t &#92;e &#92;xNN</code> (for example <code>&#92;x03</code> is Ctrl-C).</td></tr>
+                <tr><td><code>expect &lt;text&gt;</code></td><td>Wait until the device prints this text (not case-sensitive). Fails after the timeout (30 s by default).</td></tr>
+                <tr><td><code>expect-regex &lt;pattern&gt; [timeout=N]</code></td><td>Same, with a regular expression and an optional timeout in seconds.</td></tr>
+                <tr><td><code>wait &lt;seconds&gt;</code></td><td>Pause.</td></tr>
+                <tr><td><code>set idle &lt;ms&gt;</code> / <code>set timeout &lt;seconds&gt;</code></td><td>Change how long to let the device go quiet after a command (default 1500 ms) and the default <code>expect</code> timeout.</td></tr>
+                <tr><td><code># comment</code></td><td>Ignored.</td></tr>
+                <tr><td><code>{{username}} {{password}} {{site}} {{port}}</code></td><td>Filled in for each device. Username and password come from the fields below and are never saved.</td></tr>
+              </tbody>
+            </table>
+            <p class="hint">A script stops on a device at its first failed step; other devices carry on. Up to 5 devices run at a time.</p>
+          </details>
+        </div>
+        <div class="field-row">
+          <label for="batchUsername">Username</label>
+          <input type="text" id="batchUsername" autocomplete="off" style="width: 12em" />
+          <label for="batchPassword">Password</label>
+          <input type="password" id="batchPassword" autocomplete="new-password" style="width: 12em" />
+          <span class="hint">Used for <code>{{username}}</code> / <code>{{password}}</code>. Not saved.</span>
+        </div>
+        <div class="field-row column">
+          <label>Ports <span class="hint" id="batchSelectedCount"></span> <button id="batchRefreshTargetsBtn" type="button" class="secondary" style="margin-left: 8px; padding: 1px 8px; font-size: 11px;">Refresh</button></label>
+          <div id="batchTargets" class="batch-sites"></div>
+        </div>
+        <div class="field-row">
+          <button id="batchRunBtn" class="primary">Run Batch</button>
+          <span class="auth-error" id="batchError"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Batch History</h2>
+        <table class="data-table" id="batchHistoryTable">
+          <thead><tr><th>Name</th><th>Started</th><th>Status</th><th>Devices</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="hint" id="batchHistoryEmpty">No batches have been run yet.</p>
+      </div>
+    </div>
     <div class="tab-content" id="tab-log">
       <div class="panel">
         <h2>Server Log</h2>
+        <div class="field-row">
+          <button id="downloadLogBtn" class="secondary">Download Log</button>
+        </div>
+        <div class="field-row">
+          <label for="logMaxEntries">Maximum log entries</label>
+          <input type="number" id="logMaxEntries" min="100" max="100000" style="width: 7em" />
+          <button id="saveLogMaxBtn" class="primary">Save</button>
+          <span class="auth-error" id="logMaxMsg"></span>
+        </div>
         <pre class="code-block log-view" id="logView"></pre>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-system">
+      <div class="panel">
+        <h2>External Syslog Server</h2>
+        <p class="hint">Mirrors audit log entries to an external syslog server (UDP, RFC 3164) as they happen.</p>
+        <div class="field-row">
+          <label for="syslogEnabled">Enabled</label>
+          <input type="checkbox" id="syslogEnabled" />
+        </div>
+        <div class="field-row">
+          <label for="syslogHost">Server host</label>
+          <input type="text" id="syslogHost" placeholder="syslog.example.com" autocomplete="off" />
+          <label for="syslogPort">Port</label>
+          <input type="number" id="syslogPort" min="1" max="65535" style="width: 6em" />
+        </div>
+        <div class="field-row">
+          <label for="syslogFacility">Facility</label>
+          <select id="syslogFacility">
+            <option value="16">local0</option>
+            <option value="17">local1</option>
+            <option value="18">local2</option>
+            <option value="19">local3</option>
+            <option value="20">local4</option>
+            <option value="21">local5</option>
+            <option value="22">local6</option>
+            <option value="23">local7</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <button id="saveSyslogBtn">Save Settings</button>
+          <button id="testSyslogBtn" class="secondary">Send Test Message</button>
+        </div>
+        <div class="auth-error" id="syslogMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Alert Webhook</h2>
+        <p class="hint">POSTs a small JSON payload to a URL of your choice when something worth knowing about happens, so you don't have to be watching the Log tab to find out. Off by default.</p>
+        <div class="field-row">
+          <label for="alertsWebhookUrl">Webhook URL</label>
+          <input type="text" id="alertsWebhookUrl" placeholder="https://example.com/webhook" autocomplete="off" style="width: 24em" />
+        </div>
+        <div class="field-row">
+          <label>Notify when a site goes offline</label>
+          <input type="checkbox" data-alert-key="notifyOnSiteOffline" />
+        </div>
+        <div class="field-row">
+          <label>Notify when a site comes online</label>
+          <input type="checkbox" data-alert-key="notifyOnSiteOnline" />
+        </div>
+        <div class="field-row">
+          <label>Notify on an admin account lockout</label>
+          <input type="checkbox" data-alert-key="notifyOnLockout" />
+        </div>
+        <div class="field-row">
+          <label>Notify on every failed admin login</label>
+          <input type="checkbox" data-alert-key="notifyOnLoginFailure" />
+        </div>
+        <div class="field-row">
+          <label>Notify on every admin login</label>
+          <input type="checkbox" data-alert-key="notifyOnAdminLogin" />
+        </div>
+        <div class="field-row">
+          <label>Notify when a site enrolls</label>
+          <input type="checkbox" data-alert-key="notifyOnEnrollment" />
+        </div>
+        <div class="field-row">
+          <label>Send every audit-log entry (user and config changes, etc.)</label>
+          <input type="checkbox" data-alert-key="notifyOnAudit" />
+        </div>
+        <div class="field-row">
+          <button id="saveAlertsBtn">Save Settings</button>
+          <button id="testAlertsBtn" class="secondary">Send Test Alert</button>
+        </div>
+        <div class="auth-error" id="alertsMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Session Timeout</h2>
+        <p class="hint">Admins are signed out automatically after this many minutes without any mouse or keyboard activity. Set to 0 to never time out.</p>
+        <div class="field-row">
+          <label for="idleTimeoutMinutes">Idle timeout (minutes)</label>
+          <input type="number" id="idleTimeoutMinutes" min="0" max="1440" style="width: 6em" />
+          <button id="saveIdleTimeoutBtn" class="primary">Save</button>
+          <span class="auth-error" id="idleTimeoutMsg"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Password Policy</h2>
+        <p class="hint">Applies to this admin account. Edge-box sites authenticate by key, not password, so this doesn't touch them.</p>
+        <div class="field-row">
+          <label for="policyMinLength">Minimum length</label>
+          <input type="number" id="policyMinLength" min="8" max="64" style="width: 6em" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireMixedCase">Require upper &amp; lowercase letters</label>
+          <input type="checkbox" id="policyRequireMixedCase" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireDigit">Require a digit</label>
+          <input type="checkbox" id="policyRequireDigit" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireSymbol">Require a symbol</label>
+          <input type="checkbox" id="policyRequireSymbol" />
+        </div>
+        <div class="field-row">
+          <label for="policyCheckBreached">Reject common/breached passwords</label>
+          <input type="checkbox" id="policyCheckBreached" />
+        </div>
+        <div class="field-row">
+          <label for="policyRequireAdminTotp">Require two-factor authentication for admin accounts</label>
+          <input type="checkbox" id="policyRequireAdminTotp" />
+          <span class="hint">Unlike the settings above, this one only applies to hub admin accounts. An admin without 2FA set up is walked through enrolling it immediately after their next login, before reaching anything else &mdash; including you, if your own account doesn't have it on yet.</span>
+        </div>
+        <div class="field-row">
+          <button id="savePasswordPolicyBtn">Save Settings</button>
+        </div>
+        <div class="auth-error" id="passwordPolicyMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Hub SSH Host Key</h2>
+        <p class="hint">Shown here so you can verify it out-of-band before trusting a connection to this hub.</p>
+        <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
+      </div>
+
+      <div class="panel">
+        <h2>Tunnel / SSH Listener</h2>
+        <p class="hint">The single port every enrolled site's tunnel connects to, and that an admin-tunnel SSH session also uses -- default <code>443</code> (chosen so an edge site's outbound firewall almost never needs a new rule for it), but changeable if this network needs something else.</p>
+        <div class="field-row">
+          <label for="sshPort">Listen Port</label>
+          <input type="number" id="sshPort" min="1" max="65535" style="width: 7em" />
+        </div>
+        <div class="field-row">
+          <button id="saveSshSettingsBtn">Save Settings</button>
+        </div>
+        <p class="hint"><strong>Takes effect only after a restart</strong> (the TLS Certificate panel's Restart Service Now, further down this tab) -- saving alone doesn't rebind the listener. Once it restarts, every currently-connected site's tunnel drops immediately and won't be able to reconnect until that site's own Central Office panel has its Tunnel Port updated to match this new value -- this is a fleet-wide change, not a hub-only one.</p>
+        <div class="auth-error" id="sshSettingsMsg"></div>
+      </div>
+
+      <div class="panel" id="haPanel">
+        <h2>High Availability</h2>
+        <p class="hint">Configures the standalone <code>ha-agent</code> process on THIS node only -- the peer node needs its own matching configuration with role/host swapped. Saving writes <code>ha-agent/config.json</code> and, if the agent is already running here, tells it to reload live. A brand-new agent still needs its systemd service started once by hand -- see the README's "High Availability" section.</p>
+
+        <div class="field-row">
+          <label for="haEnabled">Enable HA on this node</label>
+          <input type="checkbox" id="haEnabled" />
+        </div>
+        <div class="field-row">
+          <label for="haRoleSelect">Role</label>
+          <select id="haRoleSelect">
+            <option value="primary">Primary</option>
+            <option value="secondary">Secondary</option>
+          </select>
+          <label for="haModeSelect">Failover mode</label>
+          <select id="haModeSelect">
+            <option value="vip">Virtual IP</option>
+            <option value="dns">DNS update</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="haPeerHost">Peer host</label>
+          <input type="text" id="haPeerHost" placeholder="10.0.0.6" autocomplete="off" />
+          <label for="haListenPort">This node's agent port</label>
+          <input type="number" id="haListenPort" min="1" max="65535" style="width: 6em" placeholder="8555" />
+          <label for="haPeerPort">Peer's agent port</label>
+          <input type="number" id="haPeerPort" min="1" max="65535" style="width: 6em" placeholder="8555" />
+        </div>
+
+        <div id="haVipFields">
+          <div class="field-row">
+            <label for="haVipAddress">VIP address</label>
+            <input type="text" id="haVipAddress" placeholder="10.0.0.10" autocomplete="off" />
+            <label for="haVipPrefix">Prefix length</label>
+            <input type="number" id="haVipPrefix" min="0" max="32" style="width: 5em" placeholder="24" />
+            <label for="haVipInterface">Interface</label>
+            <input type="text" id="haVipInterface" placeholder="eth0" autocomplete="off" />
+          </div>
+        </div>
+        <div id="haDnsFields" hidden>
+          <div class="field-row">
+            <label for="haDnsCommand">DNS update command</label>
+            <input type="text" id="haDnsCommand" placeholder="/opt/central-office/ha-agent/dns-update.sh" autocomplete="off" style="width: 24em" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label for="haHcInterval">Health check interval (ms)</label>
+          <input type="number" id="haHcInterval" min="500" style="width: 7em" placeholder="3000" />
+          <label for="haHcThreshold">Failure threshold</label>
+          <input type="number" id="haHcThreshold" min="1" style="width: 5em" placeholder="3" />
+          <label for="haHcTimeout">Check timeout (ms)</label>
+          <input type="number" id="haHcTimeout" min="100" style="width: 7em" placeholder="2000" />
+        </div>
+        <div class="field-row">
+          <label for="haRepInterval">Replication interval (ms)</label>
+          <input type="number" id="haRepInterval" min="1000" style="width: 7em" placeholder="5000" />
+          <label for="haRepRemoteDir">Remote data dir</label>
+          <input type="text" id="haRepRemoteDir" placeholder="/opt/central-office/data" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <label for="haRepSshUser">Replication SSH user</label>
+          <input type="text" id="haRepSshUser" placeholder="central-office" autocomplete="off" />
+          <label for="haRepSshKey">Replication SSH key path</label>
+          <input type="text" id="haRepSshKey" placeholder="/opt/central-office/ha-agent/replication-key" autocomplete="off" style="width: 20em" />
+        </div>
+        <div class="field-row">
+          <label for="haPreempt">Auto-reclaim primary role on recovery (preempt)</label>
+          <input type="checkbox" id="haPreempt" />
+        </div>
+        <div class="field-row">
+          <button id="haSaveConfigBtn">Save Configuration</button>
+          <button id="haReloadConfigBtn" class="secondary">Reload from Disk</button>
+        </div>
+        <div class="auth-error" id="haConfigMsg"></div>
+
+        <div id="haStatusSection" hidden>
+          <table class="data-table" id="haStatusTable">
+            <tbody>
+              <tr><th>Role</th><td id="haRole">&mdash;</td></tr>
+              <tr><th>Current state</th><td id="haIsActive">&mdash;</td></tr>
+              <tr><th>Failover mode</th><td id="haMode">&mdash;</td></tr>
+              <tr><th>Peer health</th><td id="haPeerHealth">&mdash;</td></tr>
+              <tr><th>Last replication</th><td id="haLastReplication">&mdash;</td></tr>
+              <tr><th>Last promoted</th><td id="haPromotedAt">&mdash;</td></tr>
+            </tbody>
+          </table>
+          <div class="field-row">
+            <button id="haRefreshBtn" class="secondary">Refresh Status</button>
+            <button id="haPromoteBtn" class="danger" hidden>Reclaim Primary Role</button>
+          </div>
+        </div>
+        <div class="auth-error" id="haMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>TLS Certificate</h2>
+        <p class="hint">Covers this admin UI's own HTTPS certificate (port 8444 in this local setup, 8443 by default). A self-signed one is generated automatically on first boot; upload your own (from an internal CA, or Let's Encrypt via a DNS challenge) to replace it.</p>
+        <table class="data-table" id="tlsInfoTable">
+          <tbody>
+            <tr><th>Type</th><td id="tlsType">&mdash;</td></tr>
+            <tr><th>Subject</th><td id="tlsSubject">&mdash;</td></tr>
+            <tr><th>Issuer</th><td id="tlsIssuer">&mdash;</td></tr>
+            <tr><th>Valid</th><td id="tlsValidity">&mdash;</td></tr>
+            <tr><th>Fingerprint (SHA-256)</th><td><code id="tlsFingerprint">&mdash;</code></td></tr>
+          </tbody>
+        </table>
+        <div class="field-row column">
+          <label for="tlsCertFile">Certificate file (PEM)</label>
+          <input type="file" id="tlsCertFile" accept=".pem,.crt,.cer,.cert" />
+        </div>
+        <div class="field-row column">
+          <label for="tlsKeyFile">Private key file (PEM)</label>
+          <input type="file" id="tlsKeyFile" accept=".pem,.key" />
+        </div>
+        <div class="field-row">
+          <button id="uploadTlsCertBtn" class="primary">Upload</button>
+          <button id="revertTlsCertBtn" class="secondary">Revert to Self-Signed</button>
+          <button id="restartServiceBtn" class="secondary">Restart Service Now</button>
+        </div>
+        <p class="hint">A change here needs the service to restart before it takes effect &mdash; active tunnels reconnect on their own, and web/SSH sessions briefly disconnect.</p>
+        <div class="auth-error" id="tlsMsg"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Backup</h2>
+        <p class="hint">Covers sites/ports, groups, console users, admin accounts (including password hashes), and enrollment tokens. Store downloaded backups somewhere secure; they contain credential data.</p>
+        <div class="field-row">
+          <label for="includeHostKeyOnBackup">Include SSH host key</label>
+          <input type="checkbox" id="includeHostKeyOnBackup" />
+          <span class="hint">Off by default. Lets a restore fully reproduce this hub, including the same host-key fingerprint edge boxes may have pinned &mdash; but the file will contain an SSH private key.</span>
+        </div>
+        <div class="field-row">
+          <button id="downloadBackupBtn" class="primary">Download Backup</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Restore</h2>
+        <p class="hint">Replaces the entire current configuration with the contents of a backup file &mdash; sites, groups, users, admin accounts, everything.</p>
+        <div class="field-row column">
+          <label for="restoreFile">Backup file</label>
+          <input type="file" id="restoreFile" accept="application/json" />
+        </div>
+        <div class="field-row">
+          <button id="restoreBtn" class="danger">Restore from Backup</button>
+        </div>
+        <div class="auth-error" id="restoreMsg"></div>
       </div>
     </div>
 
@@ -137,11 +780,11 @@
         <p class="hint">Signed in as <strong id="myUsername">&mdash;</strong>.</p>
         <div class="field-row column">
           <label for="newAdminPassword">New password <span class="hint" id="newAdminPasswordHint"></span></label>
-          <input type="password" id="newAdminPassword" minlength="8" />
+          <input type="password" id="newAdminPassword" minlength="8" autocomplete="new-password" />
         </div>
         <div class="field-row column">
           <label for="newAdminPasswordConfirm">Confirm new password</label>
-          <input type="password" id="newAdminPasswordConfirm" minlength="8" />
+          <input type="password" id="newAdminPasswordConfirm" minlength="8" autocomplete="new-password" />
         </div>
         <div class="field-row">
           <button id="changeAdminPasswordBtn">Change Password</button>
@@ -194,43 +837,29 @@
       </div>
 
       <div class="panel">
-        <h2>Password Policy</h2>
-        <p class="hint">Applies to this admin account. Edge-box sites authenticate by key, not password, so this doesn't touch them.</p>
-        <div class="field-row">
-          <label for="policyMinLength">Minimum length</label>
-          <input type="number" id="policyMinLength" min="8" max="64" style="width: 6em" />
-        </div>
-        <div class="field-row">
-          <label for="policyRequireMixedCase">Require upper &amp; lowercase letters</label>
-          <input type="checkbox" id="policyRequireMixedCase" />
-        </div>
-        <div class="field-row">
-          <label for="policyRequireDigit">Require a digit</label>
-          <input type="checkbox" id="policyRequireDigit" />
-        </div>
-        <div class="field-row">
-          <label for="policyRequireSymbol">Require a symbol</label>
-          <input type="checkbox" id="policyRequireSymbol" />
-        </div>
-        <div class="field-row">
-          <label for="policyCheckBreached">Reject common/breached passwords</label>
-          <input type="checkbox" id="policyCheckBreached" />
-        </div>
-        <div class="field-row">
-          <button id="savePasswordPolicyBtn">Save Settings</button>
-        </div>
-        <div class="auth-error" id="passwordPolicyMsg"></div>
+        <h2>Admin Accounts</h2>
+        <p class="hint">Full control over this hub -- sites, users, groups, and hub settings. Separate from console users (Users tab) and from any site's own local admin login.</p>
+        <table class="data-table" id="adminsTable">
+          <thead><tr><th>Username</th><th>Status</th><th>2FA</th><th>Last Login</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="addAdminBtn">+ Add Admin</button>
       </div>
+    </div>
 
-      <div class="panel">
-        <h2>Hub SSH Host Key</h2>
-        <p class="hint">Shown here so you can verify it out-of-band before trusting a connection to this hub.</p>
-        <pre id="hostKeyFingerprint" class="code-block">loading...</pre>
+    <div class="tab-content" id="tab-about">
+      <div class="panel about-panel">
+        <img class="about-logo" src="assets/logo.png" alt="Serial Killer Terminal Server" />
+        <h2>Central Office</h2>
+        <p class="version-tag">Version <span id="currentVersion">&hellip;</span></p>
+        <p>Fleet management hub for a Serial Killer Terminal Server appliance fleet.</p>
+        <p>Written by Terry Henry</p>
+        <p>For comments and suggestions, email <a href="mailto:skterminalserver@gmail.com">skterminalserver@gmail.com</a></p>
+        <p><a href="https://github.com/TerryHenry/central-office-hub" target="_blank" rel="noopener">View on GitHub</a></p>
       </div>
-
       <div class="panel">
         <h2>Version &amp; Updates</h2>
-        <p class="hint">Running version <strong id="currentVersion">&hellip;</strong>. Applying an update briefly restarts this service &mdash; active tunnels reconnect on their own, and web/SSH sessions disconnect and need to reconnect.</p>
+        <p class="hint">Applying an update briefly restarts this service &mdash; active tunnels reconnect on their own, and web/SSH sessions disconnect and need to reconnect.</p>
         <div class="field-row">
           <button id="checkUpdateBtn">Check for Updates</button>
         </div>
@@ -242,53 +871,18 @@
         <p class="hint" id="updateProgress"></p>
         <p><a href="https://github.com/TerryHenry/central-office-hub/releases" target="_blank" rel="noopener">View all releases on GitHub</a></p>
       </div>
+    </div>
 
-      <div class="panel">
-        <h2>Backup</h2>
-        <p class="hint">Covers sites/ports, groups, console users, admin accounts (including password hashes), and enrollment tokens. Store downloaded backups somewhere secure; they contain credential data.</p>
-        <div class="field-row">
-          <label for="includeHostKeyOnBackup">Include SSH host key</label>
-          <input type="checkbox" id="includeHostKeyOnBackup" />
-          <span class="hint">Off by default. Lets a restore fully reproduce this hub, including the same host-key fingerprint edge boxes may have pinned &mdash; but the file will contain an SSH private key.</span>
+    <div class="tab-content" id="tab-help">
+      <div class="panel" style="padding: 0; overflow: hidden;">
+        <div class="field-row" style="margin: 14px 20px 0;">
+          <a href="/QUICKSTART.html" target="_blank" rel="noopener">Quick Start</a>
+          <a href="/HANDBOOK.html" target="_blank" rel="noopener">Open Handbook in a new tab</a>
         </div>
-        <div class="field-row">
-          <button id="downloadBackupBtn" class="primary">Download Backup</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Restore</h2>
-        <p class="hint">Replaces the entire current configuration with the contents of a backup file &mdash; sites, groups, users, admin accounts, everything.</p>
-        <div class="field-row column">
-          <label for="restoreFile">Backup file</label>
-          <input type="file" id="restoreFile" accept="application/json" />
-        </div>
-        <div class="field-row">
-          <button id="restoreBtn" class="danger">Restore from Backup</button>
-        </div>
-        <div class="auth-error" id="restoreMsg"></div>
+        <iframe id="handbookFrame" title="Handbook" style="width: 100%; height: 80vh; border: none; margin-top: 10px;"></iframe>
       </div>
     </div>
-  </div>
-
-  <!-- Add site modal -->
-  <div class="modal-backdrop" id="siteModalBackdrop">
-    <div class="modal">
-      <h3>Add Site</h3>
-      <div class="field-row column">
-        <label for="siteName">Site name</label>
-        <input type="text" id="siteName" placeholder="e.g. Building 3 Wiring Closet" />
-        <span class="field-error" id="siteNameError"></span>
-      </div>
-      <div class="field-row column">
-        <label for="sitePublicKey">Tunnel public key</label>
-        <textarea id="sitePublicKey" rows="3" placeholder="ssh-ed25519 AAAA... (from the edge box's Network tab)"></textarea>
-        <span class="field-error" id="sitePublicKeyError"></span>
-      </div>
-      <div class="modal-actions">
-        <button id="cancelSiteBtn" class="secondary">Cancel</button>
-        <button id="saveSiteBtn" class="primary">Add Site</button>
-      </div>
+      </main>
     </div>
   </div>
 
@@ -341,31 +935,88 @@
   <div class="modal-backdrop" id="tokenRevealBackdrop">
     <div class="modal">
       <h3>Enrollment Token</h3>
-      <p class="hint">Paste this into the edge box's Central Office panel. It's shown once and works one time.</p>
+      <p class="hint">Paste this into the edge box's Central Office panel. It works one time, and you can view it again any time from the Enrollment Tokens list.</p>
       <pre class="code-block" id="tokenRevealValue"></pre>
       <div class="modal-actions">
+        <button id="copyTokenRevealBtn" class="secondary">Copy</button>
         <button id="closeTokenRevealBtn" class="primary">Done</button>
       </div>
     </div>
   </div>
 
   <!-- Add/edit user modal -->
+  <!-- Batch run detail -->
+  <div class="modal-backdrop" id="batchDetailBackdrop">
+    <div class="modal" style="max-width: 980px; width: 96%; max-height: 90vh; overflow-y: auto;">
+      <h3 id="batchDetailTitle"></h3>
+      <p id="batchDetailMeta"></p>
+      <details><summary class="hint">Script</summary><pre class="code-block" id="batchDetailScript"></pre></details>
+      <div id="batchDetailTargets"></div>
+      <div class="modal-actions">
+        <button id="batchDetailCloseBtn" class="secondary">Close</button>
+      </div>
+    </div>
+  </div>
+  <!-- Site neighbor discovery (LLDP/CDP/FDP) modal -->
+  <div class="modal-backdrop" id="siteLldpModalBackdrop">
+    <div class="modal" style="max-width: 960px; width: 96%;">
+      <h3>Neighbors: <span id="siteLldpSiteName"></span></h3>
+      <input type="hidden" id="siteLldpSiteId" />
+      <p class="hint" id="siteLldpState">Loading&hellip;</p>
+      <table class="data-table" id="siteLldpTable">
+        <thead><tr><th>Local Interface</th><th>Protocol</th><th>Neighbor</th><th>Neighbor Port</th><th>Mgmt IP</th><th>VLAN</th><th>Capabilities</th><th>Age</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint" id="siteLldpEmpty"></p>
+      <div class="field-row">
+        <label for="siteLldpEnabled">Enable LLDP</label>
+        <input type="checkbox" id="siteLldpEnabled" />
+        <label for="siteLldpCdp" style="margin-left:16px;">CDP</label>
+        <input type="checkbox" id="siteLldpCdp" />
+        <label for="siteLldpFdp" style="margin-left:16px;">FDP</label>
+        <input type="checkbox" id="siteLldpFdp" />
+      </div>
+      <span class="auth-error" id="siteLldpError"></span>
+      <div class="modal-actions">
+        <button id="closeSiteLldpBtn" class="secondary">Close</button>
+        <button id="refreshSiteLldpBtn" class="secondary">Refresh</button>
+        <button id="applySiteLldpBtn" class="primary">Queue Settings</button>
+      </div>
+    </div>
+  </div>
   <div class="modal-backdrop" id="userModalBackdrop">
     <div class="modal">
       <h3 id="userModalTitle">Add User</h3>
       <div class="field-row column">
         <label for="userUsername">Username</label>
-        <input type="text" id="userUsername" />
+        <input type="text" id="userUsername" autocomplete="off" />
         <span class="field-error" id="userUsernameError"></span>
       </div>
       <div class="field-row column" id="userPasswordRow">
         <label for="userPassword">Password <span class="hint" id="userPasswordHint"></span></label>
-        <input type="password" id="userPassword" />
+        <input type="password" id="userPassword" autocomplete="new-password" />
         <span class="field-error" id="userPasswordError"></span>
       </div>
       <div class="field-row column">
         <label>Groups</label>
         <div id="userGroupChecks" class="check-list"></div>
+      </div>
+      <div class="field-row">
+        <label for="userCaptureEnabled">Capture this user's sessions</label>
+        <input type="checkbox" id="userCaptureEnabled" />
+        <span class="hint">Always logs their sessions to file, on any site/port. Off by default.</span>
+      </div>
+      <div class="field-row column">
+        <label>Push to edge sites <span class="hint">(optional)</span></label>
+        <div id="userEdgeSiteChecks" class="check-list"></div>
+        <span class="hint">Also creates this account as a local login on each checked site's own SSH/web console (the same password), on its next heartbeat. Sites this user reaches through a group grant can also be synced anytime from the Sites tab.</span>
+      </div>
+      <div class="field-row">
+        <label for="userEdgePermission">Access on pushed sites</label>
+        <select id="userEdgePermission">
+          <option value="read-write">Read / write</option>
+          <option value="read-only">Read-only</option>
+        </select>
       </div>
       <input type="hidden" id="userEditId" />
       <div class="modal-actions">
@@ -412,7 +1063,200 @@
     </div>
   </div>
 
+  <!-- Configure ports modal -->
+  <div class="modal-backdrop" id="sitePortsModalBackdrop">
+    <div class="modal" style="width: 640px;">
+      <h3>Configure Ports for <span id="sitePortsSiteName"></span></h3>
+      <p class="hint">Queues a full port configuration for this site -- applied on its next heartbeat (managed mode, box must be online). This replaces its <em>entire</em> port list, so a port left out of this table on Save is removed from that site.</p>
+      <div class="table-wrap">
+        <table class="data-table" id="sitePortsTable">
+          <thead><tr><th>Label</th><th>Device Path</th><th>Baud</th><th>Access</th><th>Capture</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="field-row">
+        <button id="addSitePortRowBtn" class="secondary">+ Add Port</button>
+        <button id="scanSiteDevicesBtn" class="secondary">Scan Site for Devices</button>
+      </div>
+      <div id="sitePortsScanResults"></div>
+      <input type="hidden" id="sitePortsSiteId" />
+      <span class="field-error" id="sitePortsError"></span>
+      <div class="modal-actions">
+        <button id="cancelSitePortsBtn" class="secondary">Cancel</button>
+        <button id="saveSitePortsBtn" class="primary">Queue Port Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete port modal -->
+  <div class="modal-backdrop" id="deletePortModalBackdrop">
+    <div class="modal">
+      <h3>Delete Port</h3>
+      <p class="hint">Deletes <strong id="deletePortLabel"></strong> from this site right now -- unlike Remove above, this doesn't wait for a Queue Port Configuration save.</p>
+      <div class="field-row">
+        <label for="deletePortRemoveFromEdge">Also remove it from the site's own configuration</label>
+        <input type="checkbox" id="deletePortRemoveFromEdge" checked />
+      </div>
+      <p class="hint">Checked (recommended): also queues the removal on the site itself, applied on its next heartbeat -- same effect as removing it in Configure Ports and saving. Unchecked: only removes it from this hub's own display. If the site is still online and still configured with this port, its next heartbeat reports it again and it reappears here.</p>
+      <input type="hidden" id="deletePortSiteId" />
+      <input type="hidden" id="deletePortPortId" />
+      <span class="field-error" id="deletePortError"></span>
+      <div class="modal-actions">
+        <button id="cancelDeletePortBtn" class="secondary">Cancel</button>
+        <button id="confirmDeletePortBtn" class="danger">Delete Port</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local access modal -->
+  <div class="modal-backdrop" id="siteLocalAccessModalBackdrop">
+    <div class="modal">
+      <h3>Local Access for <span id="siteLocalAccessSiteName"></span></h3>
+      <p class="hint">Queues a change to this site's own local SSH-to-serial and web console access -- applied on its next heartbeat. Turning both off routes every session through this hub instead, where this hub's own groups and audit log apply.</p>
+      <div class="field-row">
+        <label for="siteLocalAccessSsh">Local SSH-to-serial</label>
+        <input type="checkbox" id="siteLocalAccessSsh" />
+      </div>
+      <div class="field-row">
+        <label for="siteLocalAccessWeb">Local web console (HTTPS-to-serial)</label>
+        <input type="checkbox" id="siteLocalAccessWeb" />
+      </div>
+      <input type="hidden" id="siteLocalAccessSiteId" />
+      <span class="field-error" id="siteLocalAccessError"></span>
+      <div class="modal-actions">
+        <button id="cancelSiteLocalAccessBtn" class="secondary">Cancel</button>
+        <button id="saveSiteLocalAccessBtn" class="primary">Queue Change</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site TFTP server modal -->
+  <div class="modal-backdrop" id="siteTftpSettingsModalBackdrop">
+    <div class="modal">
+      <h3>TFTP Server for <span id="siteTftpSettingsSiteName"></span></h3>
+      <p class="hint">Queues a change to this site's own TFTP server -- applied on its next heartbeat. Changing the port while running restarts it there.</p>
+      <div class="field-row">
+        <label for="siteTftpSettingsEnabled">Server running</label>
+        <input type="checkbox" id="siteTftpSettingsEnabled" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsPort">Listen port</label>
+        <input type="number" id="siteTftpSettingsPort" min="1" max="65535" style="width: 6em" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsAllowUpload">Allow uploads</label>
+        <input type="checkbox" id="siteTftpSettingsAllowUpload" />
+      </div>
+      <div class="field-row">
+        <label for="siteTftpSettingsAutoStart">Start automatically on boot</label>
+        <input type="checkbox" id="siteTftpSettingsAutoStart" />
+      </div>
+      <input type="hidden" id="siteTftpSettingsSiteId" />
+      <span class="field-error" id="siteTftpSettingsError"></span>
+      <div class="modal-actions">
+        <button id="cancelSiteTftpSettingsBtn" class="secondary">Cancel</button>
+        <button id="saveSiteTftpSettingsBtn" class="primary">Queue Change</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/edit admin modal -->
+  <div class="modal-backdrop" id="adminModalBackdrop">
+    <div class="modal">
+      <h3 id="adminModalTitle">Add Admin</h3>
+      <div class="field-row column">
+        <label for="adminUsername">Username</label>
+        <input type="text" id="adminUsername" autocomplete="off" />
+        <span class="field-error" id="adminUsernameError"></span>
+      </div>
+      <div class="field-row column">
+        <label for="adminPassword">Password <span class="hint" id="adminPasswordHint">(leave blank to keep existing)</span></label>
+        <input type="password" id="adminPassword" minlength="8" autocomplete="new-password" />
+        <label for="adminPasswordConfirm">Confirm password</label>
+        <input type="password" id="adminPasswordConfirm" minlength="8" autocomplete="new-password" />
+        <span class="field-error" id="adminPasswordError"></span>
+      </div>
+      <input type="hidden" id="adminId" />
+      <div class="modal-actions">
+        <button id="cancelAdminBtn" class="secondary">Cancel</button>
+        <button id="saveAdminBtn" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site info modal -->
+  <div class="modal-backdrop" id="siteInfoModalBackdrop">
+    <div class="modal" style="width: 560px;">
+      <h3>Site Info for <span id="siteInfoSiteName"></span></h3>
+      <p class="hint" id="siteInfoLoading">Fetching a live snapshot from the site&hellip;</p>
+      <span class="field-error" id="siteInfoError"></span>
+      <table class="data-table" id="siteInfoTable" hidden>
+        <tbody>
+          <tr><th>Hostname</th><td id="siteInfoHostname">&mdash;</td></tr>
+          <tr><th>mDNS name</th><td id="siteInfoMdns">&mdash;</td></tr>
+          <tr><th>IP addresses</th><td id="siteInfoIps">&mdash;</td></tr>
+          <tr><th>Public IP</th><td id="siteInfoPublicIp">&mdash;</td></tr>
+          <tr><th>Connected clients</th><td id="siteInfoClients">&mdash;</td></tr>
+          <tr><th>Operating System</th><td id="siteInfoOs">&mdash;</td></tr>
+          <tr><th>Kernel</th><td id="siteInfoKernel">&mdash;</td></tr>
+          <tr><th>Architecture</th><td id="siteInfoArch">&mdash;</td></tr>
+          <tr><th>CPU</th><td id="siteInfoCpu">&mdash;</td></tr>
+          <tr><th>Memory</th><td id="siteInfoMemory">&mdash;</td></tr>
+          <tr><th>Disk</th><td id="siteInfoDisk">&mdash;</td></tr>
+          <tr><th>Uptime</th><td id="siteInfoUptime">&mdash;</td></tr>
+          <tr><th>Node.js</th><td id="siteInfoNode">&mdash;</td></tr>
+          <tr><th>App Version</th><td id="siteInfoAppVersion">&mdash;</td></tr>
+        </tbody>
+      </table>
+      <div class="modal-actions">
+        <button id="refreshSiteInfoBtn" class="secondary" hidden>Refresh</button>
+        <button id="closeSiteInfoBtn" class="primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload to TFTP modal -->
+  <div class="modal-backdrop" id="siteTftpUploadModalBackdrop">
+    <div class="modal">
+      <h3>Upload to TFTP Directory</h3>
+      <p class="hint">Sends a file straight to the TFTP root directory on each target site below, over its existing encrypted tunnel -- the site must be online. Overwrites a file already there with the same name.</p>
+      <div class="field-row column">
+        <label>Target site(s)</label>
+        <div id="siteTftpUploadTargets" class="check-list" style="max-height: 140px;"></div>
+      </div>
+      <div class="field-row column">
+        <label for="siteTftpUploadFile">File</label>
+        <input type="file" id="siteTftpUploadFile" />
+      </div>
+      <span class="field-error" id="siteTftpUploadError"></span>
+      <div id="siteTftpUploadResults"></div>
+      <div class="modal-actions">
+        <button id="cancelSiteTftpUploadBtn" class="secondary">Cancel</button>
+        <button id="saveSiteTftpUploadBtn" class="primary">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename site modal -->
+  <div class="modal-backdrop" id="siteRenameModalBackdrop">
+    <div class="modal">
+      <h3>Rename Site</h3>
+      <div class="field-row column">
+        <label for="siteRenameName">Site name</label>
+        <input type="text" id="siteRenameName" />
+        <span class="field-error" id="siteRenameError"></span>
+      </div>
+      <input type="hidden" id="siteRenameSiteId" />
+      <div class="modal-actions">
+        <button id="cancelSiteRenameBtn" class="secondary">Cancel</button>
+        <button id="saveSiteRenameBtn" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="qrcode-bridge.js"></script>
   <script src="app.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="batch.js"></script>
 </body>
 </html>

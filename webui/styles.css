@@ -49,11 +49,32 @@ button.primary:hover { background: var(--accent-hover); }
 button.secondary { background: transparent; }
 button.danger { color: var(--danger); border-color: var(--danger-border); }
 
-.tabs { display: flex; gap: 2px; padding: 8px 16px 0 16px; border-bottom: 1px solid var(--border); }
-.tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 14px; color: var(--text-dim); white-space: nowrap; }
-.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
-.tab-content { display: none; overflow-y: auto; flex: 1; padding: 20px; }
+/* Left sidebar navigation, grouped like the edge appliance's */
+.app-body { display: flex; flex: 1; min-height: 0; }
+.sidebar { width: 196px; flex-shrink: 0; display: flex; flex-direction: column; overflow-y: auto; padding: 14px 10px; border-right: 1px solid var(--border); }
+.sidebar-main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.sidebar-footer { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 1px; }
+.nav-group { display: flex; flex-direction: column; gap: 1px; }
+.nav-group-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent-hover); padding: 0 10px 5px; }
+.sidebar .tab-btn { background: transparent; border: none; border-left: 2px solid transparent; border-radius: 6px; padding: 8px 10px; text-align: left; color: var(--text-dim); font-size: 13px; white-space: nowrap; }
+.sidebar .tab-btn:hover { background: var(--overlay-1); color: var(--text); }
+.sidebar .tab-btn.active { background: var(--overlay-2); color: var(--text); border-left-color: var(--accent); font-weight: 500; }
+.tab-panel-area { flex: 1; overflow-y: auto; padding: 20px; min-width: 0; }
+.tab-content { display: none; }
 .tab-content.active { display: block; }
+
+/* On a narrow screen the sidebar becomes a scrollable strip across the top instead. */
+@media (max-width: 760px) {
+  .app-body { flex-direction: column; }
+  .sidebar { width: auto; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid var(--border); padding: 6px 8px; }
+  .sidebar-main { flex-direction: row; gap: 4px; flex: none; }
+  .nav-group { flex-direction: row; align-items: center; gap: 2px; }
+  .nav-group-label { display: none; }
+  .sidebar-footer { flex-direction: row; border-top: none; margin: 0 0 0 4px; padding: 0; }
+  .sidebar .tab-btn { border-left: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 10px; }
+  .sidebar .tab-btn.active { border-bottom-color: var(--accent); }
+  .tab-panel-area { padding: 12px; }
+}
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
 .panel:last-child { margin-bottom: 0; }
@@ -94,6 +115,8 @@ code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overla
 .grant-site-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .grant-site-block > label { font-weight: 600; }
 .grant-ports { display: flex; flex-direction: column; gap: 4px; padding-left: 22px; margin-top: 4px; }
+.grant-port-row { display: flex; align-items: center; gap: 8px; }
+.grant-port-row select { font-size: 11.5px; padding: 2px 4px; }
 
 .grant-list { display: flex; flex-direction: column; gap: 4px; }
 .grant-list .grant-item { display: flex; align-items: center; gap: 8px; }
@@ -109,3 +132,170 @@ code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overla
 .terminal-wrap { display: flex; flex-direction: column; height: 100vh; }
 .terminal-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .terminal-header .title { flex: 1; font-size: 13px; color: var(--text-dim); }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-label {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-sub {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.stat-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--overlay-2);
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease, background 0.2s ease;
+}
+
+.stat-bar-fill.warn { background: var(--warn); }
+.stat-bar-fill.danger { background: var(--danger); }
+
+.topology-legend { display: flex; gap: 16px; margin-bottom: 10px; }
+.topology-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.topology-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
+.topology-dot.online { background: var(--ok); }
+.topology-dot.offline { background: var(--danger); }
+.topology-dot.unknown { background: var(--text-dim); }
+
+.topology-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.topology-wrap .hint { padding: 16px; margin: 0; }
+#topologySvg { display: block; }
+.topology-node-label { fill: var(--text); font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+.topology-node-sub { fill: var(--text-dim); font-size: 10.5px; }
+.topology-edge { fill: none; stroke: var(--border); stroke-width: 1.5; }
+.topology-node { stroke-width: 1.5; }
+.topology-node.hub { fill: var(--accent); stroke: var(--accent-hover); }
+.topology-node.online { fill: var(--ok); stroke: var(--ok); }
+.topology-node.offline { fill: var(--danger); stroke: var(--danger); }
+.topology-node.warn { fill: var(--warn); stroke: var(--warn); }
+.topology-node.standby { fill: var(--bg); stroke: var(--text-dim); }
+.topology-edge.ha-link { stroke-dasharray: 3 3; }
+
+.row-menu { position: relative; display: inline-block; }
+.row-menu-btn { padding: 3px 9px; font-size: 15px; line-height: 1.2; }
+.row-menu-dropdown {
+  /* position: fixed (not absolute) and placed via JS from the trigger button's
+     getBoundingClientRect() -- .data-table sets overflow-x: auto, which per the CSS
+     overflow spec also forces overflow-y to auto (mismatched visible/non-visible axes
+     resolve to auto), so an absolutely-positioned dropdown anchored inside a table cell
+     would get clipped by the table's own scrollbox. Fixed positioning is relative to the
+     viewport and escapes that entirely. */
+  display: none;
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  min-width: 180px;
+  z-index: 20;
+  padding: 4px;
+}
+.row-menu-dropdown.open { display: block; }
+.row-menu-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.row-menu-dropdown button:hover { background: var(--overlay-2); }
+.row-menu-dropdown button.danger { color: var(--danger); }
+.row-menu-dropdown button.danger:hover { background: rgba(229, 83, 75, 0.12); }
+.row-menu-divider { height: 1px; background: var(--border); margin: 4px 2px; }
+
+.about-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 48px 20px;
+}
+
+.about-logo {
+  width: 220px;
+  height: 220px;
+  border-radius: 24px;
+  box-shadow: 0 8px 28px var(--shadow, rgba(0,0,0,0.4));
+  margin-bottom: 16px;
+}
+
+.about-panel h2 { margin: 0 0 4px; }
+.about-panel p { margin: 0; color: var(--text-dim); }
+.about-panel a { color: var(--accent); }
+.about-panel .version-tag {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--overlay-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin: 2px 0 10px;
+}
+
+.topology-port-link { cursor: pointer; }
+.topology-port-link:hover .topology-node { stroke: var(--text, #fff); stroke-width: 2; }
+/* Configurable dashboard */
+.dash-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.dash-hidden-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dash-hidden-bar:empty { display: none; }
+.widget-hidden { display: none !important; }
+.widget-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 14px 0; padding: 6px 8px; border: 1px dashed var(--border); border-radius: 6px; font-size: 12px; }
+.widget-bar .grow { flex: 1; font-weight: 600; }
+.widget-bar button { padding: 2px 10px; font-size: 12px; }
+.widget-stat-toggles { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; padding-top: 4px; }
+.widget-stat-toggles label { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
+.log-tail { margin: 0; max-height: 220px; overflow: auto; font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+/* Batch actions */
+.pill.bad { background: rgba(229, 83, 75, 0.14); color: var(--danger); }
+.batch-script { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.batch-sites { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding: 6px 2px; }
+.batch-site-head { display: flex; align-items: center; gap: 6px; }
+.batch-ports { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 0 0 24px; }
+.batch-port { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
+.batch-help summary { cursor: pointer; font-size: 12px; margin-top: 4px; }
+details.batch-target { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; margin: 8px 0; }
+details.batch-target summary { cursor: pointer; }
+.batch-steps { margin: 8px 0; }
+.batch-transcript { max-height: 220px; overflow: auto; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; }

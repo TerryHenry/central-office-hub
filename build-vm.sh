@@ -49,8 +49,15 @@ echo "==> Resolving latest release of $REPO..."
 RELEASE_JSON=$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/releases/latest")
 TARBALL_URL=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='central-office-app.tar.gz'))")
 CHECKSUM_URL=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='central-office-app.tar.gz.sha256'))")
+SIGNATURE_URL=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(a['browser_download_url'] for a in d['assets'] if a['name']=='central-office-app.tar.gz.sig'))")
 RELEASE_TAG=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
 echo "    $RELEASE_TAG -- $TARBALL_URL"
+
+# Baked into the VM as its own file below, never fetched from GitHub at self-update
+# time -- this is the same trust anchor lib/selfUpdate.js's PUBLIC_KEY_PATH checks
+# future releases against, so it has to come from this local, already-trusted repo
+# checkout, not from the same release it's meant to be verifying.
+PUBKEY_CONTENT=$(cat "$SCRIPT_DIR/release-signing-pubkey.pem")
 
 echo "==> Downloading base image (Debian 12 genericcloud, amd64)..."
 BASE_IMG="$BUILD_DIR/debian-12-genericcloud-amd64.qcow2"
@@ -129,9 +136,17 @@ systemctl enable open-vm-tools.service 2>/dev/null || true
 mkdir -p /opt/central-office
 cd /opt/central-office
 
+# Written here, deliberately outside the tarball extraction below and never
+# downloaded from GitHub -- see lib/selfUpdate.js's PUBLIC_KEY_PATH comment for why
+# a future update package must never be able to rewrite this file.
+cat > /opt/central-office/release-signing-pubkey.pem <<'PUBKEY_EOF'
+$PUBKEY_CONTENT
+PUBKEY_EOF
+
 echo "==> Downloading $RELEASE_TAG app tarball..."
 retry curl -fL -o /tmp/app.tar.gz "$TARBALL_URL"
 retry curl -fL -o /tmp/app.tar.gz.sha256 "$CHECKSUM_URL"
+retry curl -fL -o /tmp/app.tar.gz.sig "$SIGNATURE_URL"
 EXPECTED_SHA=\$(cat /tmp/app.tar.gz.sha256 | awk '{print \$1}')
 ACTUAL_SHA=\$(sha256sum /tmp/app.tar.gz | awk '{print \$1}')
 if [ "\$EXPECTED_SHA" != "\$ACTUAL_SHA" ]; then
@@ -140,8 +155,21 @@ if [ "\$EXPECTED_SHA" != "\$ACTUAL_SHA" ]; then
   poweroff
   exit 1
 fi
+
+# The checksum above only proves the download matches what GitHub is currently
+# serving, not who published it -- verify it was actually signed with the expected
+# key before baking it into a VM image other people will import and trust. Debian
+# 12's stock openssl (3.x) supports Ed25519 verification natively via pkeyutl.
+base64 -d /tmp/app.tar.gz.sig > /tmp/app.tar.gz.sig.bin
+if ! openssl pkeyutl -verify -pubin -inkey /opt/central-office/release-signing-pubkey.pem \
+    -rawin -in /tmp/app.tar.gz.sha256 -sigfile /tmp/app.tar.gz.sig.bin; then
+  echo "FATAL: release signature verification failed -- refusing to bake this release into a VM image" >&2
+  echo "BUILD_FAILED" > /dev/console
+  poweroff
+  exit 1
+fi
 tar -xzf /tmp/app.tar.gz -C /opt/central-office
-rm -f /tmp/app.tar.gz /tmp/app.tar.gz.sha256
+rm -f /tmp/app.tar.gz /tmp/app.tar.gz.sha256 /tmp/app.tar.gz.sig /tmp/app.tar.gz.sig.bin
 
 chmod +x /opt/central-office/provisioning/*.sh
 bash /opt/central-office/provisioning/setup.sh

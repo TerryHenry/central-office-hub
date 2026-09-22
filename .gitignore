@@ -2,3 +2,12 @@ node_modules/
 /data/
 /build/
 .DS_Store
+*.log
+*.tar.gz
+
+# Release-signing PRIVATE key material must never live in this repo -- only
+# release-signing-pubkey.pem (the public half) belongs here. This is a safety net,
+# not the actual safeguard: the real private key should never be created anywhere
+# under this directory in the first place.
+*.PRIVATE.pem
+release-signing-key.pem

@@ -16,6 +16,15 @@ RestartSec=3
 User=central-office
 Group=central-office
 Environment=CO_DATA_DIR=/opt/central-office/data
+# Lets privileged ports get bound without running the whole app as root: the tunnel/SSH
+# server's own default (443, chosen so an edge site's outbound firewall doesn't need a
+# new rule for it) and the TFTP server's standard port 69 (off by default) both need
+# this. No CapabilityBoundingSet restriction here on purpose -- that setting applies to
+# the whole process tree including the `sudo` child the app shells out to for the
+# system-helper.sh calls above, and a narrow bounding set breaks sudo's own root
+# transition outright. The sudoers rule in setup.sh is the actual privilege boundary, not
+# this.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
