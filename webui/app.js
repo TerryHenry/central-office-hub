@@ -674,6 +674,18 @@ async function loadSites() {
         }
       }
     });
+    if (site.connected) {
+      const shellIcon = document.createElement('span');
+      const shellEnabled = !!site.edgeRemoteShellEnabled;
+      shellIcon.className = `shell-status-icon${shellEnabled ? ' enabled' : ''}`;
+      shellIcon.textContent = '>_';
+      shellIcon.title = shellEnabled
+        ? 'Diagnostic shell enabled on this box'
+        : site.edgeRemoteShellEnabled === false
+          ? 'Diagnostic shell disabled on this box -- turn it on in its own Fleet panel'
+          : 'Diagnostic shell status unknown -- this box has not reported it yet';
+      actionsCell.appendChild(shellIcon);
+    }
     actionsCell.appendChild(buildRowMenu(menuItems));
     tbody.appendChild(tr);
   }

@@ -203,6 +203,14 @@ code { font-family: ui-monospace, "SF Mono", monospace; background: var(--overla
 .topology-node.online { fill: var(--ok); stroke: var(--ok); }
 .topology-node.offline { fill: var(--danger); stroke: var(--danger); }
 
+.shell-status-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px; margin-right: 4px;
+  background: var(--overlay-1); color: var(--text-dim); border: 1px solid var(--border);
+  font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; line-height: 1;
+}
+.shell-status-icon.enabled { color: var(--ok); border-color: rgba(63, 185, 80, 0.4); }
+
 .row-menu { position: relative; display: inline-block; }
 .row-menu-btn { padding: 3px 9px; font-size: 15px; line-height: 1.2; }
 .row-menu-dropdown {
