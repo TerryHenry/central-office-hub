@@ -169,7 +169,11 @@ For a release to be self-update-capable (and for `build-vm.sh` to pick it up), i
 GitHub Release needs three assets:
 
 - `central-office-app.tar.gz` -- `server.js`, `package.json`/`package-lock.json`,
-  `lib/`, `webui/`, `provisioning/` (no `node_modules`).
+  `lib/`, `webui/`, `provisioning/`, `HANDBOOK.html`, `QUICKSTART.html` (no
+  `node_modules`). The last two are what the Help tab's embedded Handbook actually
+  serves from `APP_DIR` on a deployed box -- leaving them out of this tarball means
+  every fresh OVA and every self-updated box silently loses in-app help, since neither
+  provisioning path places them any other way.
 - `central-office-app.tar.gz.sha256` -- its checksum. The updater refuses to apply a
   download that doesn't match this exactly.
 - `central-office-app.tar.gz.sig` -- a detached Ed25519 signature over the checksum
@@ -182,7 +186,7 @@ GitHub Release needs three assets:
 ```bash
 tar -czf build/central-office-app.tar.gz \
   --exclude='node_modules' --exclude='build' --exclude='.DS_Store' \
-  server.js package.json package-lock.json lib webui provisioning
+  server.js package.json package-lock.json lib webui provisioning HANDBOOK.html QUICKSTART.html
 shasum -a 256 build/central-office-app.tar.gz | awk '{print $1}' > build/central-office-app.tar.gz.sha256
 node scripts/sign-release.js build/central-office-app.tar.gz.sha256 \
   /path/to/release-signing-key.PRIVATE.pem build/central-office-app.tar.gz.sig
