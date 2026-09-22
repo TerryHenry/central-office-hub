@@ -87,19 +87,35 @@ case "${1:-}" in
       useradd --system --home-dir "$HA_DIR" --shell /usr/sbin/nologin central-office-ha
     fi
 
+    # Lets the main app's own service account keep writing config.json here (below)
+    # after this directory is handed to central-office-ha -- without this, every
+    # "Save Configuration" click in the admin UI after a Set Up would fail EACCES,
+    # since central-office wouldn't be a member of any group that can write here.
+    # Mirrors ha-agent.service's own SupplementaryGroups=central-office grant, in the
+    # other direction. Only takes effect for central-office.service on its NEXT start
+    # (a running process doesn't pick up new group membership live) -- the caller
+    # (Node) tells the admin a restart is needed to finish setup.
+    usermod -aG central-office-ha central-office
+
     mkdir -p "$HA_DIR"
     chown central-office-ha:central-office-ha "$HA_DIR"
-    chmod 700 "$HA_DIR"
+    # 770 with the sticky bit, not 700: central-office (via the group grant above)
+    # needs to create/write config.json here on every config save, not just once at
+    # setup. The sticky bit stops it from deleting or replacing files it doesn't own
+    # (replication-key below) even with that directory-level write access -- the same
+    # protection /tmp uses for a shared-write directory.
+    chmod 1770 "$HA_DIR"
 
     if [ ! -f "$HA_DIR/config.json" ]; then
       cp "$APP_DIR/ha-agent-config.example.json" "$HA_DIR/config.json"
     fi
     # Re-applied every run (not just on first creation) -- the main app's own
     # /api/ha/config handler may have already written this file as the central-office
-    # user before ha-setup ever ran, which would leave it owned wrong for the agent
-    # (which runs as central-office-ha) to read.
+    # user before ha-setup ever ran, which would leave it owned wrong. Group-writable
+    # (not owner-only) so central-office can keep saving config through the admin UI --
+    # config.json holds topology/tuning, not secrets, unlike replication-key below.
     chown central-office-ha:central-office-ha "$HA_DIR/config.json"
-    chmod 600 "$HA_DIR/config.json"
+    chmod 660 "$HA_DIR/config.json"
 
     if [ ! -f "$HA_DIR/replication-key" ]; then
       sudo -u central-office-ha ssh-keygen -t ed25519 -f "$HA_DIR/replication-key" -N "" -C "central-office-ha-replication" >/dev/null

@@ -2001,7 +2001,32 @@ document.getElementById('haSetupBtn').addEventListener('click', async () => {
       document.getElementById('haPubkeySection').hidden = false;
       document.getElementById('haAuthorizedKeysLine').textContent = result.authorizedKeysLine;
     }
+    // Setup just granted this app's service account new group access -- a running
+    // process doesn't pick that up until it restarts, so config saves would 403/EACCES
+    // until then.
+    document.getElementById('haRestartNeeded').hidden = false;
     await loadHaServiceStatus();
+  } catch (err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('haRestartServiceBtn').addEventListener('click', async () => {
+  if (!confirm('Restart the service now? Active tunnels and web/SSH sessions will briefly disconnect. This finishes HA setup by letting the service pick up the permissions it was just granted.')) return;
+  const msg = document.getElementById('haSetupMsg');
+  msg.style.color = 'var(--text-dim)';
+  msg.textContent = 'Restarting…';
+  try {
+    await api.post('/api/system/restart-service');
+    const backUp = await pollUntilBackUp(() => {
+      msg.textContent = 'Waiting for the service to come back...';
+    });
+    msg.style.color = backUp ? 'var(--ok)' : 'var(--danger)';
+    msg.textContent = backUp
+      ? 'Service restarted. HA setup is complete -- Save Configuration should work now.'
+      : 'Restart requested, but the service did not come back within the timeout -- check it directly.';
+    if (backUp) document.getElementById('haRestartNeeded').hidden = true;
   } catch (err) {
     msg.style.color = 'var(--danger)';
     msg.textContent = err.message;

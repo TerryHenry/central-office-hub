@@ -635,6 +635,12 @@
           <span id="haServiceStatusPill"></span>
         </div>
         <div class="auth-error" id="haSetupMsg"></div>
+        <div id="haRestartNeeded" hidden>
+          <p class="hint">Setup grants this app's own service account access to <code>config.json</code> here for the first time -- that only takes effect after a restart. <strong>Save Configuration will fail with a permission error until you restart.</strong></p>
+          <div class="field-row">
+            <button id="haRestartServiceBtn" class="secondary">Restart Service Now</button>
+          </div>
+        </div>
         <div id="haPubkeySection" hidden>
           <p class="hint">This node's replication public key, ready to paste into the <strong>peer</strong> node's <code>central-office</code> account <code>~/.ssh/authorized_keys</code> (the peer needs a matching line of its own, pointing at its own data directory):</p>
           <pre id="haAuthorizedKeysLine" class="code-block"></pre>
