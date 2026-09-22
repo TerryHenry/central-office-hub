@@ -517,8 +517,22 @@ function buildRowMenu(items) {
   return wrap;
 }
 
-async function loadSites() {
+/** Fetches sites and sorts each one's ports alphabetically by label -- matches the
+ * appliance's own Ports tab, which already sorts the same way. The hub's port order is
+ * otherwise whatever a site's heartbeat happened to report, which isn't necessarily
+ * meaningful to a human reading the list. Every caller that lists ports (topology,
+ * Sites table, port pickers) goes through this one fetch, so they all inherit the same
+ * order instead of each needing its own sort. */
+async function fetchSites() {
   const sites = await api.get('/api/sites');
+  for (const site of sites) {
+    site.ports.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+  }
+  return sites;
+}
+
+async function loadSites() {
+  const sites = await fetchSites();
   renderTopology(sites);
   const tbody = document.querySelector('#sitesTable tbody');
   // This re-renders on every SSE 'sites' broadcast -- which fires on essentially every
@@ -1347,7 +1361,7 @@ async function openUserModal(user) {
   const edgeChecksEl = document.getElementById('userEdgeSiteChecks');
   edgeChecksEl.innerHTML = '';
   try {
-    const sites = await api.get('/api/sites');
+    const sites = await fetchSites();
     if (sites.length === 0) edgeChecksEl.innerHTML = '<span class="hint">No sites enrolled yet.</span>';
     for (const site of sites) {
       const label = document.createElement('label');
@@ -1400,7 +1414,7 @@ async function loadGroups() {
   allGroups = await api.get('/api/groups');
   const tbody = document.querySelector('#groupsTable tbody');
   tbody.innerHTML = '';
-  const sites = await api.get('/api/sites');
+  const sites = await fetchSites();
   for (const group of allGroups) {
     const tr = document.createElement('tr');
     const grantsEl = document.createElement('div');
