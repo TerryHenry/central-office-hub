@@ -174,36 +174,51 @@ app itself has no failover logic and doesn't need to know HA exists. See
   tie-breaker, which this doesn't implement -- `failureThreshold` (default 3, not 1) is
   the main defense against a false promotion from a transient blip, not a partition.
 
-### Setup (run on both VMs)
+### Setup (run on both VMs -- entirely from the admin UI, no shell required)
 
-1. Provision the main app normally first (`provisioning/setup.sh`, above).
-2. `sudo bash provisioning/ha-setup.sh` -- creates the `central-office-ha` service
-   account, installs `ha-agent.service`, and grants it the narrow sudoers rule it needs
-   to start/stop the main service. It does **not** need `ha-agent-config.example.json`
-   copied by hand anymore -- the next step does that from the web UI.
-3. Log into the admin UI for **this** node and open the Admin Accounts tab's **High
-   Availability** panel. Fill in `role` (`primary` on one VM, `secondary` on the
-   other), `peerHost`, `listenPort`/`peerPort` (same number on both nodes is simplest,
-   since each is a different host), and either the VIP fields or a DNS update command,
-   then **Save Configuration**. This writes `/opt/central-office/ha-agent/config.json`
-   directly -- if `ha-agent.service` is already running on this node it also applies
-   the change live (interval/threshold/mode/enabled changes take effect immediately, no
-   restart); if the service isn't running yet, saving just prepares the file for step 5.
-   Repeat on the peer node with its own (swapped) values.
-4. Set up cross-VM SSH trust for replication -- not automated, since it's a one-time,
-   security-sensitive step: generate a keypair, put the private half at the
-   `sshKeyPath` your config points to, and add the public half to the **peer's**
-   `central-office` account's `~/.ssh/authorized_keys`, restricted to rsync only:
-   ```
-   command="rsync --server --sender -logDtprze.iLsfxCIvu . /opt/central-office/data",restrict ssh-ed25519 AAAA...
-   ```
-5. `sudo systemctl enable --now ha-agent.service` on both nodes.
+The VM appliance ships with no OS-level login by default, so every step below is driven
+from the **High Availability** panel's **Node Setup** section, not a terminal.
 
-The same **High Availability** panel's status section (visible once `ha-agent` has
-written its first status) shows current role, peer health, last replication time, and
-the manual failback button. `ha-agent-config.example.json` is still in the repo as a
-reference for the config shape, but hand-editing the file directly is no longer the
-expected path -- use the panel, which validates input before writing it.
+1. Provision the main app normally first (automatic on the OVA; `provisioning/setup.sh`
+   for the bare-Debian install path above).
+2. Log into the admin UI for **this** node, open the High Availability panel, and click
+   **Set Up HA Agent on This Node**. This creates the `central-office-ha` service
+   account, installs `ha-agent.service`, grants it the narrow sudoers rule it needs to
+   start/stop the main service, and generates this node's replication SSH keypair --
+   everything `provisioning/ha-setup.sh` used to require a shell for. It shows this
+   node's public key afterward, already formatted as the `authorized_keys` line the
+   **peer** needs (see step 4).
+3. In the same panel's **Configuration** section, fill in `role` (`primary` on one VM,
+   `secondary` on the other), `peerHost`, `listenPort`/`peerPort` (same number on both
+   nodes is simplest, since each is a different host), and either the VIP fields or a
+   DNS update command, then **Save Configuration**. This writes
+   `/opt/central-office/ha-agent/config.json` directly -- if `ha-agent.service` is
+   already running on this node it also applies the change live (interval/threshold/
+   mode/enabled changes take effect immediately, no restart); if the service isn't
+   running yet, saving just prepares the file for step 5. Repeat on the peer node with
+   its own (swapped) values.
+4. Set up cross-VM SSH trust for replication -- still a one-time, security-sensitive
+   step that genuinely needs a human on both ends (one node can't unilaterally vouch for
+   the other), but neither half needs a shell anymore:
+   - Paste the `authorized_keys` line **Set Up HA Agent** showed you (step 2) into the
+     **peer's** `central-office` account `~/.ssh/authorized_keys` -- restricted to
+     rsync only, pointing at the peer's own data directory:
+     ```
+     command="rsync --server --sender -logDtprze.iLsfxCIvu . /opt/central-office/data",restrict ssh-ed25519 AAAA...
+     ```
+   - On **this** node's panel, enter the peer's address under **Trust Peer's SSH Host
+     Key** and click **Scan Host Key**. Compare the fingerprint it shows against the
+     peer itself (its own Hub SSH Host Key panel, or a console session) before clicking
+     **Trust This Key** -- the same confirmation an interactive `ssh` session would ask
+     for, just without a shell to ask it in. Repeat on the peer node, pointed at this one.
+5. Click **Start HA Agent Service** in the panel (both nodes). Equivalent to
+   `sudo systemctl enable --now ha-agent.service`, without the shell.
+
+The panel's status section (visible once `ha-agent` has written its first status) shows
+current role, peer health, last replication time, and the manual failback button.
+`ha-agent-config.example.json` is still in the repo as a reference for the config shape,
+but hand-editing the file directly is no longer the expected path -- use the panel,
+which validates input before writing it.
 
 ## Applying updates
 
