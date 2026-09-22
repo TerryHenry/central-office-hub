@@ -614,6 +614,13 @@ async function loadSites() {
       });
       menuItems.push({ label: 'View Site Info', onClick: () => openSiteInfoModal(site) });
       menuItems.push({ label: 'Upload to TFTP', onClick: () => openSiteTftpUploadModal([site]) });
+      menuItems.push({
+        label: 'Open Diagnostic Shell',
+        onClick: () => {
+          const url = `/shell?siteId=${encodeURIComponent(site.id)}`;
+          window.open(url, '_blank', 'noopener');
+        }
+      });
     }
     if (site.lastBackup) {
       menuItems.push({
