@@ -537,6 +537,10 @@
           <input type="checkbox" data-alert-key="notifyOnLockout" />
         </div>
         <div class="field-row">
+          <label>Notify on UPS power events (on battery, low battery, back online)</label>
+          <input type="checkbox" data-alert-key="notifyOnUpsPower" />
+        </div>
+        <div class="field-row">
           <label>Notify on every failed admin login</label>
           <input type="checkbox" data-alert-key="notifyOnLoginFailure" />
         </div>
@@ -886,6 +890,26 @@
         <button id="closeSiteLldpBtn" class="secondary">Close</button>
         <button id="refreshSiteLldpBtn" class="secondary">Refresh</button>
         <button id="applySiteLldpBtn" class="primary">Queue Settings</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="siteUpsModalBackdrop">
+    <div class="modal" style="max-width: 520px;">
+      <h3>UPS Status: <span id="siteUpsSiteName"></span></h3>
+      <p class="hint" id="siteUpsState">Loading&hellip;</p>
+      <table class="data-table" id="siteUpsTable" hidden>
+        <tbody>
+          <tr><th>Power state</th><td id="siteUpsPowerState">&mdash;</td></tr>
+          <tr><th>Battery charge</th><td id="siteUpsBatteryCharge">&mdash;</td></tr>
+          <tr><th>Estimated runtime</th><td id="siteUpsRuntime">&mdash;</td></tr>
+          <tr><th>Load</th><td id="siteUpsLoad">&mdash;</td></tr>
+          <tr><th>Model</th><td id="siteUpsModel">&mdash;</td></tr>
+        </tbody>
+      </table>
+      <span class="auth-error" id="siteUpsError"></span>
+      <div class="modal-actions">
+        <button id="closeSiteUpsBtn" class="secondary">Close</button>
+        <button id="refreshSiteUpsBtn" class="secondary">Refresh</button>
       </div>
     </div>
   </div>

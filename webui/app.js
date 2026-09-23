@@ -333,6 +333,19 @@ function commandVerificationPill(site) {
   return '';
 }
 
+/** UPS status as of this site's last heartbeat -- absent entirely (null) when the site
+ * doesn't have UPS monitoring configured/enabled, same "stays silent" convention as
+ * adminsSyncPill/commandVerificationPill above, since most sites simply won't have one. */
+function upsPill(site) {
+  const ups = site.ups;
+  if (!ups) return '';
+  if (ups.onBattery) {
+    const charge = ups.batteryCharge !== null && ups.batteryCharge !== undefined ? ` (${ups.batteryCharge}%)` : '';
+    return `<br><span class="pill ${ups.lowBattery ? 'bad' : 'warn'}" title="This site's UPS is running on battery${ups.lowBattery ? ' and reporting LOW BATTERY' : ''}"><span class="dot"></span>On battery${escapeHtml(charge)}</span>`;
+  }
+  return `<br><span class="pill ok" title="This site's UPS is on line power"><span class="dot"></span>UPS OK</span>`;
+}
+
 // ---------- Fleet topology diagram (Dashboard tab) ----------
 // Ports carry their own reported `present` flag from the edge box's heartbeat when
 // available (see configStore.recordHeartbeat) and fall back to the site's tunnel state
@@ -569,7 +582,7 @@ async function loadSites() {
     tr.innerHTML = `
       <td><input type="checkbox" class="site-select" data-site="${site.id}" ${previouslyChecked.has(site.id) ? 'checked' : ''} /></td>
       <td>${escapeHtml(site.name)}</td>
-      <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}${commandVerificationPill(site)}</td>
+      <td>${statusPill(site.connected)}${localAccessPill(site)}${adminsSyncPill(site)}${commandVerificationPill(site)}${upsPill(site)}</td>
       <td>${versionInfo}</td>
       <td>${lastSeen}</td>
       <td>${backupInfo}</td>
@@ -635,6 +648,7 @@ async function loadSites() {
     menuItems.push({ label: 'Configure Ports', onClick: () => openSitePortsModal(site) });
     menuItems.push({ label: 'Local Access', onClick: () => openSiteLocalAccessModal(site) });
     menuItems.push({ label: 'Neighbors (LLDP)', onClick: () => openSiteLldpModal(site) });
+    menuItems.push({ label: 'UPS Status', onClick: () => openSiteUpsModal(site) });
     menuItems.push({ label: 'TFTP Server', onClick: () => openSiteTftpSettingsModal(site) });
     menuItems.push('divider');
     menuItems.push({
@@ -1059,6 +1073,56 @@ document.getElementById('applySiteLldpBtn').addEventListener('click', async () =
     errEl.textContent = err.message;
   }
 });
+// ---------- UPS status (live one-shot query, read-only from the hub) ----------
+let siteUpsSiteId = null;
+
+async function loadSiteUps() {
+  const stateEl = document.getElementById('siteUpsState');
+  const errEl = document.getElementById('siteUpsError');
+  const table = document.getElementById('siteUpsTable');
+  errEl.textContent = '';
+  table.hidden = true;
+  stateEl.textContent = 'Asking the site…';
+  try {
+    const data = await api.get(`/api/sites/${siteUpsSiteId}/ups`);
+    if (!data.config || !data.config.enabled) {
+      stateEl.textContent = 'UPS monitoring is not enabled on this site (its own Network tab).';
+      return;
+    }
+    if (!data.live) {
+      stateEl.textContent = data.liveError || 'No live UPS data available right now.';
+      return;
+    }
+    stateEl.textContent = '';
+    table.hidden = false;
+    const live = data.live;
+    document.getElementById('siteUpsPowerState').innerHTML = live.onBattery
+      ? `<span class="pill ${live.lowBattery ? 'bad' : 'warn'}">On battery${live.lowBattery ? ' -- LOW' : ''}</span>`
+      : live.online
+        ? '<span class="pill ok">On line power</span>'
+        : `<span class="pill mute">${escapeHtml((live.statusCodes || []).join(' ') || 'Unknown')}</span>`;
+    document.getElementById('siteUpsBatteryCharge').textContent = live.batteryCharge !== null ? `${live.batteryCharge}%` : 'unknown';
+    document.getElementById('siteUpsRuntime').textContent =
+      live.batteryRuntimeSeconds !== null ? `${Math.round(live.batteryRuntimeSeconds / 60)} min` : 'unknown';
+    document.getElementById('siteUpsLoad').textContent = live.loadPercent !== null ? `${live.loadPercent}%` : 'unknown';
+    document.getElementById('siteUpsModel').textContent = live.model || 'unknown';
+  } catch (err) {
+    stateEl.textContent = '';
+    errEl.textContent = err.message;
+  }
+}
+
+function openSiteUpsModal(site) {
+  siteUpsSiteId = site.id;
+  document.getElementById('siteUpsSiteName').textContent = site.name;
+  document.getElementById('siteUpsModalBackdrop').classList.add('open');
+  loadSiteUps();
+}
+document.getElementById('closeSiteUpsBtn').addEventListener('click', () => {
+  document.getElementById('siteUpsModalBackdrop').classList.remove('open');
+});
+document.getElementById('refreshSiteUpsBtn').addEventListener('click', () => loadSiteUps());
+
 // ---------- Local access (hub-pushed, applied on the site's next heartbeat) ----------
 function openSiteLocalAccessModal(site) {
   document.getElementById('siteLocalAccessSiteId').value = site.id;
