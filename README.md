@@ -10,6 +10,9 @@ just want to enroll a site? See [QUICKSTART.html](QUICKSTART.html). For the full
 reference -- the web admin UI, permissions, session capture, and syslog forwarding --
 see [HANDBOOK.html](HANDBOOK.html).
 
+<img width="1490" height="774" alt="image" src="https://github.com/user-attachments/assets/754b305b-405e-4b25-bd7d-27f54785bac2" />
+
+
 ## What it does
 
 - **Reverse-tunnel site enrollment** -- an edge box connects out to this hub and
