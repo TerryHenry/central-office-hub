@@ -13,6 +13,36 @@ see [HANDBOOK.html](HANDBOOK.html).
 <img width="1490" height="774" alt="image" src="https://github.com/user-attachments/assets/754b305b-405e-4b25-bd7d-27f54785bac2" />
 
 
+## Features at a glance
+
+**Reaching your sites**
+- Edge boxes tunnel out to the hub over SSH, so no inbound port is needed at the site; a site that drops and reconnects replaces its stale connection cleanly
+- One place to reach every enrolled site's serial ports, over SSH or a browser-based console with a site -> port picker
+- Open a site's own admin UI through its tunnel, and (if the site has allowed it) a diagnostic shell on the box
+- Live queries over the tunnel: device scan, site info, baud-rate detect, and LLDP / CDP / FDP neighbors
+
+**Access control**
+- Groups and console users, with per-grant read/write or read-only permissions, so a person reaches exactly the ports they need across any number of sites
+- Push users to edge sites, or sync them to replace a site's local logins
+- Multiple hub admin accounts with login throttling, an enforceable password policy, optional TOTP two-factor authentication (also on hub SSH logins), and an idle timeout
+
+**Fleet management**
+- One-time enrollment tokens (or re-enrollment of a replacement box), with SSH host-key pinning so a site can detect a man-in-the-middle
+- Automatic port reporting every 30 seconds, plus remote add/edit/remove of a site's ports
+- Remote TFTP server control and file push, singly or to several sites at once
+- Batch actions: run one script against many ports across sites
+- Queue in-place updates for a site, applied on its next heartbeat
+
+**Visibility**
+- Configurable dashboard, audit log, session capture, and syslog forwarding
+- Alert webhook for events such as a site going offline or coming back, admin lockouts and admin logins
+
+**Deployment and updates**
+- Install on an existing Debian/Ubuntu host, or import the prebuilt VM appliance (OVA)
+- One-click in-place updates for the hub itself, signature- and checksum-verified
+
+The sections below cover each of these in detail.
+
 ## What it does
 
 - **Reverse-tunnel site enrollment** -- an edge box connects out to this hub and
